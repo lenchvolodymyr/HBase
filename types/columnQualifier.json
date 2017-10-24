@@ -1,0 +1,22 @@
+{
+	"name": "columnQualifier",
+	"erdAbbreviation": "<cQ>",
+	"dtdAbbreviation": "{...}",
+	"parentType": "document",
+	"defaultValues": {
+		"type": "document",
+		"childType": "columnQualifier",
+		"primaryKey": false,
+		"relationshipType": "",
+		"parentRelationship": "",
+		"childRelationships": [],
+		"foreignCollection": "",
+		"foreignField": [],
+		"properties": [],
+		"dependencies": [],
+		"minProperties": "",
+		"maxProperties": "",
+		"additionalProperties": false,
+		"enum": []
+	}
+}
