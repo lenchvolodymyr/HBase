@@ -1,0 +1,23 @@
+{
+	"name": "byte",
+	"erdAbbreviation": "<byte>",
+	"dtdAbbreviation": "{ABC}",
+	"useSample": true,
+	"parentType": "string",
+	"defaultValues": {
+		"type": "string",
+		"childType": "byte",
+		"minLength": "",
+		"maxLength": "",
+		"pattern": "",
+		"default": "",
+		"primaryKey": false,
+		"relationshipType": "",
+		"parentRelationship": "",
+		"childRelationships": [],
+		"foreignCollection": "",
+		"foreignField": [],
+		"enum": [],
+		"sample": ""
+	}
+}

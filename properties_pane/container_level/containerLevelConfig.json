@@ -68,6 +68,7 @@ making sure that you maintain a proper JSON format.
 				"object"
 			],
 			"defaultType": "object",
+			"valueType": "object",
 			"disabledFieldOption": true
 		}],
 		"structure": [

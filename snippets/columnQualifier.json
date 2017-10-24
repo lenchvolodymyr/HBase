@@ -1,0 +1,8 @@
+{
+	"name": "columnQualifier",
+	"parentType": "document",
+	"properties": [{
+		"name": "New column",
+		"type": "colQual"
+	}]
+}
