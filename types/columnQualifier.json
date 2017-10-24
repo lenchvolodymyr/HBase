@@ -1,11 +1,11 @@
 {
-	"name": "columnQualifier",
+	"name": "colQual",
 	"erdAbbreviation": "<cQ>",
 	"dtdAbbreviation": "{...}",
 	"parentType": "document",
 	"defaultValues": {
 		"type": "document",
-		"childType": "columnQualifier",
+		"childType": "colQual",
 		"primaryKey": false,
 		"relationshipType": "",
 		"parentRelationship": "",
@@ -17,6 +17,7 @@
 		"minProperties": "",
 		"maxProperties": "",
 		"additionalProperties": false,
-		"enum": []
+		"enum": [],
+		"snippet": "timestamp"
 	}
 }

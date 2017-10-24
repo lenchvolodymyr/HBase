@@ -17,6 +17,7 @@
 		"minProperties": "",
 		"maxProperties": "",
 		"additionalProperties": false,
-		"enum": []
+		"enum": [],
+		"snippet": "columnQualifier"
 	}
 }
