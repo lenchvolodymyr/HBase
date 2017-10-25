@@ -1,0 +1,10 @@
+{
+	"name": "timestamp",
+	"parentType": "document",
+	"properties": [{
+		"name": "^Timestamp[0-9]+$",
+		"type": "byte",
+		"isPatternField": true,
+		"sampleName": "Timestamp1"
+	}]
+}
