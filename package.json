@@ -9,7 +9,7 @@
 	},
 	"contributes": {
 		"target": {
-			"applicationTarget": "BLABLA",
+			"applicationTarget": "HBase",
 			"title": "HBase",
 			"versions": [
 				"1.1.x",
