@@ -4,7 +4,6 @@
 	"dtdAbbreviation": "{ABC}",
 	"useSample": true,
 	"defaultValues": {
-		"type": "string",
 		"minLength": "",
 		"maxLength": "",
 		"pattern": "",
