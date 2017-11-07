@@ -4,8 +4,6 @@
 	"dtdAbbreviation": "{...}",
 	"parentType": "document",
 	"defaultValues": {
-		"type": "document",
-		"childType": "colFam",
 		"primaryKey": false,
 		"relationshipType": "",
 		"parentRelationship": "",

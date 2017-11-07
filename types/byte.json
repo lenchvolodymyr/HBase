@@ -5,8 +5,6 @@
 	"useSample": true,
 	"parentType": "string",
 	"defaultValues": {
-		"type": "string",
-		"childType": "byte",
 		"minLength": "",
 		"maxLength": "",
 		"pattern": "",
