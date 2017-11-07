@@ -4,8 +4,6 @@
 	"dtdAbbreviation": "{...}",
 	"parentType": "document",
 	"defaultValues": {
-		"type": "document",
-		"childType": "colQual",
 		"primaryKey": false,
 		"relationshipType": "",
 		"parentRelationship": "",
