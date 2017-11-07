@@ -2,7 +2,8 @@
 	"model": {
 		"modelName": "New model",
 		"dbVersion": "",
-		"dbVendor": "Apache HBase"
+		"dbVendor": "Apache HBase",
+		"port": 9200
 	},
 	"container": {
 		"name": "New namespace",

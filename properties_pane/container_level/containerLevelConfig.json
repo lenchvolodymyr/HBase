@@ -57,7 +57,7 @@ making sure that you maintain a proper JSON format.
 	{
 		"lowerTab": "Details",
 		"containerLevelKeys": [{
-			"labelName": "",
+			"labelName": "Row Key",
 			"propertyName": "Row Key",
 			"propertyKeyword": "rowKey",
 			"defaultName": "Row Key",
