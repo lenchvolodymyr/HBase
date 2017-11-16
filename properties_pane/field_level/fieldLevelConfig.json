@@ -56,6 +56,9 @@ making sure that you maintain a proper JSON format.
 {
 	"lowerTab": "JsonDetails",
 	"structure": {
+		"colFam": "document",
+		"colQual": "document",
+		"byte": "string",
 		"string": [
 			"name",
 			"schemaId",
@@ -92,6 +95,32 @@ making sure that you maintain a proper JSON format.
 				]
 			}
 		],
-		"object": "document"
+		"number": [
+			"name",
+			"schemaId",
+			"type",
+			"description",
+			"dependencies",
+			"required",
+			"primaryKey",
+			"foreignCollection",
+			"foreignField",
+			"relationshipType",
+			"default",
+			"unit",
+			"minimum",
+			"exclusiveMinimum",
+			"maximum",
+			"exclusiveMaximum",
+			"multipleOf",
+			"divisibleBy",
+			"enum",
+			"sample",
+			"comments"
+		],
+		"boolean": "boolean",
+		"object": "document",
+		"array": "array",
+		"null": "null"
 	}
 }
