@@ -42,7 +42,8 @@ making sure that you maintain a proper JSON format.
 				"propertyKeyword": "numericProp",
 				"propertyValidate": true,
 				"propertyType": "numeric",
-				"valueType": "number"
+				"valueType": "number",
+				"allowNegative": false
 			},
 			{
 				"propertyName": "Checkbox",
@@ -77,23 +78,7 @@ making sure that you maintain a proper JSON format.
 			"format",
 			"enum",
 			"sample",
-			"comments",
-			{
-				"propertyName": "Other Attribute",
-				"propertyKeyword": "otherAttrib",
-				"shouldValidate": false,
-				"propertyType": "text",
-				"arrayItemDisabled": true,
-				"enableForReference": true,
-				"disabledOnCondition": [{
-						"key": "key",
-						"value": true
-					}, {
-						"key": "documentKind",
-						"value": true
-					}
-				]
-			}
+			"comments"
 		],
 		"number": [
 			"name",
