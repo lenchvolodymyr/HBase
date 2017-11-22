@@ -1,8 +1,9 @@
 {
-	"name": "string",
-	"erdAbbreviation": "<str>",
+	"name": "byte",
+	"erdAbbreviation": "<byte>",
 	"dtdAbbreviation": "{ABC}",
 	"useSample": true,
+	"parentType": "string",
 	"defaultValues": {
 		"minLength": "",
 		"maxLength": "",

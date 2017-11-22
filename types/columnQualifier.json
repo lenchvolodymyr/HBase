@@ -1,6 +1,6 @@
 {
-	"name": "colFam",
-	"erdAbbreviation": "<cF>",
+	"name": "colQual",
+	"erdAbbreviation": "<cQ>",
 	"dtdAbbreviation": "{...}",
 	"parentType": "document",
 	"defaultValues": {
@@ -16,6 +16,6 @@
 		"maxProperties": "",
 		"additionalProperties": false,
 		"enum": [],
-		"snippet": "columnQualifier"
+		"snippet": "timestamp"
 	}
 }

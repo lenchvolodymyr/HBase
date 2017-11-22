@@ -6,6 +6,7 @@
 * IntegrIT S.A. or in accordance with the terms and conditions stipulated in 
 * the agreement/contract under which the software has been supplied. 
 
+
 In order to define custom properties for any object's properties pane, you may copy/paste from the following,
 making sure that you maintain a proper JSON format.
 
@@ -13,7 +14,8 @@ making sure that you maintain a proper JSON format.
 				"propertyName": "Simple text",
 				"propertyKeyword": "simpletextProp",
 				"shouldValidate": false,
-				"propertyType": "text"
+				"propertyType": "text",
+				"sampleGen": "&containerName|&entityName|&random|<value>"
 			},
 			{
 				"propertyName": "Text area",
@@ -40,14 +42,40 @@ making sure that you maintain a proper JSON format.
 				"propertyName": "Numeric",
 				"propertyKeyword": "numericProp",
 				"propertyValidate": true,
-				"propertyType": "text",
-				"valueType": "number"
+				"propertyType": "numeric",
+				"valueType": "number",
+				"allowNegative": false,
+				"sampleGen": "&containerName|&entityName|&random|<value>"
 			},
 			{
 				"propertyName": "Checkbox",
 				"propertyKeyword": "checkboxProp",
 				"shouldValidate": false,
 				"propertyType": "checkbox"
+			},
+			{
+				"propertyName": "Group",
+				"propertyType": "group",
+				"propertyKeyword": "grpProp",
+				"shouldValidate": true,
+				"propertyTooltip": "",
+				"structure": [
+					{
+						"propertyName": "Simple Grp Text",
+						"propertyKeyword": "simpleGrpText",
+						"shouldValidate": false,
+						"propertyTooltip": "",
+						"propertyType": "text"
+					},
+					{
+						"propertyName": "Group Number",
+						"propertyKeyword": "grpNumber",
+						"propertyValidate": true,
+						"propertyType": "numeric",
+						"valueType": "number",
+						"allowNegative": false
+					}
+				]
 			}
 
 */
@@ -93,7 +121,6 @@ making sure that you maintain a proper JSON format.
 				"propertyKeyword": "port",
 				"shouldValidate": false,
 				"propertyTooltip": "Port",
-				"propertyDefault": 9200,
 				"propertyType": "numeric",
 				"valueType": "number"
 			},
