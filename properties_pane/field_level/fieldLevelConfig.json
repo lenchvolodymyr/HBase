@@ -83,7 +83,24 @@ making sure that you maintain a proper JSON format.
 {
 	"lowerTab": "JsonDetails",
 	"structure": {
-		"colFam": "document",
+		"colFam": [
+			"name",
+			"schemaId",
+			"type",
+			"description",
+			"dependencies",
+			"required",
+			{
+				"propertyName": "Time-to-Live",
+				"propertyKeyword": "ttl",
+				"propertyValidate": true,
+				"propertyType": "numeric",
+				"valueType": "number",
+				"allowNegative": false,
+				"sampleGen": "&containerName|&entityName|&random|<value>"
+			},
+			"comments"
+		],
 		"colQual": "document",
 		"byte": "string",
 		"string": [
@@ -145,6 +162,7 @@ making sure that you maintain a proper JSON format.
 			"sample",
 			"comments"
 		],
+		"counter": "numeric",
 		"boolean": "boolean",
 		"object": "document",
 		"array": "array",
