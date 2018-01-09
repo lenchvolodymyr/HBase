@@ -20,7 +20,8 @@
 		},
 		"features": {
 			"nestedCollections": false,
-			"jaySchemaHasRequiredPatternField": true
+			"jaySchemaHasRequiredPatternField": true,
+			"disableReverseEngineering": true
 		}
 	},
 	"description": "Hackolade plugin for Apache HBase"
