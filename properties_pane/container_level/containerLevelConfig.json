@@ -14,7 +14,8 @@ making sure that you maintain a proper JSON format.
 				"propertyName": "Simple text",
 				"propertyKeyword": "simpletextProp",
 				"shouldValidate": false,
-				"propertyType": "text"
+				"propertyType": "text",
+				"sampleGen": "&containerName|&entityName|&random|<value>"
 			},
 			{
 				"propertyName": "Text area",
@@ -42,13 +43,39 @@ making sure that you maintain a proper JSON format.
 				"propertyKeyword": "numericProp",
 				"propertyValidate": true,
 				"propertyType": "numeric",
-				"valueType": "number"
+				"valueType": "number",
+				"allowNegative": false,
+				"sampleGen": "&containerName|&entityName|&random|<value>"
 			},
 			{
 				"propertyName": "Checkbox",
 				"propertyKeyword": "checkboxProp",
 				"shouldValidate": false,
 				"propertyType": "checkbox"
+			},
+			{
+				"propertyName": "Group",
+				"propertyType": "group",
+				"propertyKeyword": "grpProp",
+				"shouldValidate": true,
+				"propertyTooltip": "",
+				"structure": [
+					{
+						"propertyName": "Simple Grp Text",
+						"propertyKeyword": "simpleGrpText",
+						"shouldValidate": false,
+						"propertyTooltip": "",
+						"propertyType": "text"
+					},
+					{
+						"propertyName": "Group Number",
+						"propertyKeyword": "grpNumber",
+						"propertyValidate": true,
+						"propertyType": "numeric",
+						"valueType": "number",
+						"allowNegative": false
+					}
+				]
 			}
 
 */
@@ -60,7 +87,7 @@ making sure that you maintain a proper JSON format.
 			"labelName": "Row Key",
 			"propertyName": "Row Key",
 			"propertyKeyword": "rowKey",
-			"defaultName": "^Row Key[0-9]*$",
+			"defaultName": "^[a-zA-Z0-9_.-]*$",
 			"propertyPrimaryKey": true,
 			"propertyType": "text",
 			"typeName": "Data type",
