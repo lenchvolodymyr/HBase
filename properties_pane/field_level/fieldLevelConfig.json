@@ -14,7 +14,8 @@ making sure that you maintain a proper JSON format.
 				"propertyName": "Simple text",
 				"propertyKeyword": "simpletextProp",
 				"shouldValidate": false,
-				"propertyType": "text"
+				"propertyType": "text",
+				"sampleGen": "&containerName|&entityName|&random|<value>"
 			},
 			{
 				"propertyName": "Text area",
@@ -43,13 +44,38 @@ making sure that you maintain a proper JSON format.
 				"propertyValidate": true,
 				"propertyType": "numeric",
 				"valueType": "number",
-				"allowNegative": false
+				"allowNegative": false,
+				"sampleGen": "&containerName|&entityName|&random|<value>"
 			},
 			{
 				"propertyName": "Checkbox",
 				"propertyKeyword": "checkboxProp",
 				"shouldValidate": false,
 				"propertyType": "checkbox"
+			},
+			{
+				"propertyName": "Group",
+				"propertyType": "group",
+				"propertyKeyword": "grpProp",
+				"shouldValidate": true,
+				"propertyTooltip": "",
+				"structure": [
+					{
+						"propertyName": "Simple Grp Text",
+						"propertyKeyword": "simpleGrpText",
+						"shouldValidate": false,
+						"propertyTooltip": "",
+						"propertyType": "text"
+					},
+					{
+						"propertyName": "Group Number",
+						"propertyKeyword": "grpNumber",
+						"propertyValidate": true,
+						"propertyType": "numeric",
+						"valueType": "number",
+						"allowNegative": false
+					}
+				]
 			}
 
 */
@@ -57,7 +83,24 @@ making sure that you maintain a proper JSON format.
 {
 	"lowerTab": "JsonDetails",
 	"structure": {
-		"colFam": "document",
+		"colFam": [
+			"name",
+			"schemaId",
+			"type",
+			"description",
+			"dependencies",
+			"required",
+			{
+				"propertyName": "Time-to-Live",
+				"propertyKeyword": "ttl",
+				"propertyValidate": true,
+				"propertyType": "numeric",
+				"valueType": "number",
+				"allowNegative": false,
+				"sampleGen": "&containerName|&entityName|&random|<value>"
+			},
+			"comments"
+		],
 		"colQual": "document",
 		"byte": "string",
 		"string": [
@@ -103,6 +146,30 @@ making sure that you maintain a proper JSON format.
 			"sample",
 			"comments"
 		],
+		"number": [
+			"name",
+			"schemaId",
+			"type",
+			"description",
+			"dependencies",
+			"required",
+			"primaryKey",
+			"foreignCollection",
+			"foreignField",
+			"relationshipType",
+			"default",
+			"unit",
+			"minimum",
+			"exclusiveMinimum",
+			"maximum",
+			"exclusiveMaximum",
+			"multipleOf",
+			"divisibleBy",
+			"enum",
+			"sample",
+			"comments"
+		],
+		"counter": "numeric",
 		"boolean": "boolean",
 		"object": "document",
 		"array": "array",
