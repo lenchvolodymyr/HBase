@@ -1,22 +1,46 @@
 'use strict';
 
-const config = require("./config");
-const documentClient = require("documentdb").DocumentClient;
-const client = new documentClient(config.endpoint, { "masterKey": config.accountKey });
-const async = require('async');
-const _ = require('lodash');
+//const async = require('async');
+//const _ = require('lodash');
+const hbase = require('hbase');
+
+var client = null;
 
 module.exports = {
 	connect: function(connectionInfo, cb){
-		cb()
+		let options = {
+			host: connectionInfo.host,
+			port: connectionInfo.post
+		};
+
+		client = hbase({ options });
+		client.version( function( error, version ){
+		  if(error){
+		  	console.log(error);
+		  	return cb(error);
+		  }
+		  console.log( version );
+		  return cb(true)
+		});
 	},
 
 	disconnect: function(connectionInfo, cb){
 		cb()
 	},
 
-	testConnection: function(connectionInfo, cb){
-		cb(true);
+	testConnection: function(connectionInfo, logger, cb){
+		let options = {
+			host: connectionInfo.host,
+			port: connectionInfo.post
+		};
+
+		client = hbase({ options });
+		client.version( function( error, version ){
+			if(error){
+				return cb(error);
+			}
+			return cb(null)
+		});
 	},
 
 	getDatabases: function(connectionInfo, cb){
