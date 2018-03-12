@@ -6,6 +6,9 @@ const hbase = require('hbase');
 const fetch = require('node-fetch');
 
 var client = null;
+var state = {
+	connectionInfo: null
+};
 
 module.exports = {
 	connect: function(connectionInfo, logger, cb){
@@ -40,59 +43,13 @@ module.exports = {
 		});
 	},
 
-	getDatabases: function(connectionInfo, logger, cb){
-		
-	},
-
-	getDocumentKinds: function(connectionInfo, cb) {
-		readDatabaseById(connectionInfo.database, (err, database) => {
-			if(err){
-				console.log(err);
-			} else {
-				listCollections(database._self, (err, collections) => {
-					if(err){
-						console.log(err);
-						dbItemCallback(err)
-					} else {
-
-						async.map(collections, (collectionItem, collItemCallback) => {
-							readCollectionById(database.id, collectionItem.id, (err, collection) => {
-								if(err){
-									console.log(err);
-								} else {
-									let size = getSampleDocSize(1000, connectionInfo.recordSamplingSettings) || 1000;
-
-									listDocuments(collection._self, size, (err, documents) => {
-										if(err){
-											console.log(err);
-										} else {
-											documents  = filterDocuments(documents);
-
-											let inferSchema = generateCustomInferSchema(collectionItem.id, documents, { sampleSize: 20 });
-											let documentsPackage = getDocumentKindDataFromInfer({ bucketName: collectionItem.id, inference: inferSchema, isCustomInfer: true }, 90);
-
-											collItemCallback(err, documentsPackage);
-										}
-									});
-								}
-							});
-						}, (err, items) => {
-							if(err){
-								console.log(err);
-							}
-							return cb(err, items);
-						});
-					}
-				});
-			}
-		});
-	},
-
 	getDbCollectionsNames: function(connectionInfo, logger, cb) {
 		this.connect(connectionInfo, logger, err => {
 			if(err){
 				return cb(err);
 			}
+
+			state.connectionInfo = connectionInfo;
 
 
 			getNamespacesList(connectionInfo, (err, res) => {
@@ -101,7 +58,6 @@ module.exports = {
 					cb(err);
 				} else {
 					let namespaces = res.Namespace;
-					logger.log('info', {namespaces});
 
 					async.map(namespaces, (namespace, callback) => {
 						getTablesList(connectionInfo, namespace, callback);
@@ -114,84 +70,108 @@ module.exports = {
 		});
 	},
 
-	getDbCollectionsData: function(data, cb){
-		let includeEmptyCollection = data.includeEmptyCollection;
+	getDbCollectionsData: function(data, logger, cb){
 		let { recordSamplingSettings, fieldInference } = data;
 		let size = getSampleDocSize(1000, recordSamplingSettings) || 1000;
-		let bucketList = data.collectionData.dataBaseNames;
+		let namespaces = data.collectionData.dataBaseNames;
 
-		readDatabaseById(data.database, (err, database) => {
-			if(err){
-				console.log(err);
-			} else {
-				async.map(bucketList, (bucketName, collItemCallback) => {
-					readCollectionById(database.id, bucketName, (err, collection) => {
-						if(err){
-							console.log(err);
-						} else {
-							getOfferType(collection, (err, info) => {
-								if(err){
+		async.map(namespaces, (namespace, callback) => {
+			let tables = data.collectionData.collections[namespace];
 
-								} else {
-									let bucketInfo = {
-										throughput: info.content.offerThroughput,
-										rump: info.content.offerIsRUPerMinuteThroughputEnabled ? 'OFF' : 'On'
- 									};
-
- 									let indexes = getIndexes(collection.indexingPolicy);
-
-									listDocuments(collection._self, size, (err, documents) => {
-										if(err){
-											console.log(err);
-										} else {
-											documents = filterDocuments(documents);
-											let documentKindName = data.documentKinds[collection.id].documentKindName || '*';
-											let docKindsList = data.collectionData.collections[bucketName];
-											let collectionPackages = [];
-
-											if(documentKindName !== '*'){
-												docKindsList.forEach(docKindItem => {
-													let newArrayDocuments = documents.filter((item) => {
-														return item[documentKindName] === docKindItem;
-													});
-
-													let documentsPackage = {
-														dbName: bucketName,
-														collectionName: docKindItem,
-														documents: newArrayDocuments || [],
-														indexes: [],
-														bucketIndexes: indexes,
-														views: [],
-														validation: false,
-														docType: documentKindName,
-														bucketInfo
-													};
-
-													if(fieldInference.active === 'field'){
-														documentsPackage.documentTemplate = documents[0] || null;
-													}
-
-													collectionPackages.push(documentsPackage)
-												});
-											}
-
-											collItemCallback(err, collectionPackages);
-										}
-									});
-								}
-							})
-						}
-					});
-				}, (err, items) => {
+			async.map(tables, (table, tableCallback) => {
+				getTableSchema(namespace, table, state.connectionInfo, logger, (err, schema) => {
 					if(err){
-						console.log(err);
+						logger.log('error', err);
+						return tableCallback(err);
 					}
-					return cb(err, items);
+
+					return tableCallback(null, { table, schema });
 				});
-			}
-		});
+			}, (err, items) => {
+				logger.log('error', err);
+				return callback(err, { namespace, schemas: items });
+			});
+		}, cb);
+
+		
+
+		// readDatabaseById(data.database, (err, database) => {
+		// 	if(err){
+		// 		console.log(err);
+		// 	} else {
+		// 		async.map(bucketList, (bucketName, collItemCallback) => {
+		// 			readCollectionById(database.id, bucketName, (err, collection) => {
+		// 				if(err){
+		// 					console.log(err);
+		// 				} else {
+		// 					getOfferType(collection, (err, info) => {
+		// 						if(err){
+
+		// 						} else {
+		// 							let bucketInfo = {
+		// 								throughput: info.content.offerThroughput,
+		// 								rump: info.content.offerIsRUPerMinuteThroughputEnabled ? 'OFF' : 'On'
+ 	// 								};
+
+ 	// 								let indexes = getIndexes(collection.indexingPolicy);
+
+		// 							listDocuments(collection._self, size, (err, documents) => {
+		// 								if(err){
+		// 									console.log(err);
+		// 								} else {
+		// 									documents = filterDocuments(documents);
+		// 									let documentKindName = data.documentKinds[collection.id].documentKindName || '*';
+		// 									let docKindsList = data.collectionData.collections[bucketName];
+		// 									let collectionPackages = [];
+
+		// 									if(documentKindName !== '*'){
+		// 										docKindsList.forEach(docKindItem => {
+		// 											let newArrayDocuments = documents.filter((item) => {
+		// 												return item[documentKindName] === docKindItem;
+		// 											});
+
+		// 											let documentsPackage = {
+		// 												dbName: bucketName,
+		// 												collectionName: docKindItem,
+		// 												documents: newArrayDocuments || [],
+		// 												indexes: [],
+		// 												bucketIndexes: indexes,
+		// 												views: [],
+		// 												validation: false,
+		// 												docType: documentKindName,
+		// 												bucketInfo
+		// 											};
+
+		// 											if(fieldInference.active === 'field'){
+		// 												documentsPackage.documentTemplate = documents[0] || null;
+		// 											}
+
+		// 											collectionPackages.push(documentsPackage)
+		// 										});
+		// 									}
+
+		// 									collItemCallback(err, collectionPackages);
+		// 								}
+		// 							});
+		// 						}
+		// 					})
+		// 				}
+		// 			});
+		// 		}, (err, items) => {
+		// 			if(err){
+		// 				console.log(err);
+		// 			}
+		// 			return cb(err, items);
+		// 		});
+		// 	}
+		// });
 	}
 };
+
+function getHostURI(connectionInfo){
+	let query = `http://${connectionInfo.host}:${connectionInfo.port}`;
+	return query;
+}
 
 
 function getRequestOptions(connectionInfo){
@@ -212,7 +192,7 @@ function getRequestOptions(connectionInfo){
 	};
 }
 
-function fetchRequest(query, connectionInfo){
+function fetchRequest(query, connectionInfo, logger){
 	let options = getRequestOptions(connectionInfo);
 	let response;
 
@@ -222,6 +202,7 @@ function fetchRequest(query, connectionInfo){
 			return res.text();
 		})
 		.then(body => {
+			if(logger) logger.log('info', {schema: body})
 			body = JSON.parse(body);
 
 			if(!response.ok){
@@ -234,7 +215,7 @@ function fetchRequest(query, connectionInfo){
 }
 
 function getNamespacesList(connectionInfo, cb){
-	let query = `http://${connectionInfo.host}:${connectionInfo.port}/namespaces`;
+	let query = `${getHostURI(connectionInfo)}/namespaces`;
 
 	return fetchRequest(query, connectionInfo).then(res => {
 		return cb(null, res);
@@ -245,7 +226,7 @@ function getNamespacesList(connectionInfo, cb){
 }
 
 function getTablesList(connectionInfo, namespace, cb){
-	let query = `http://${connectionInfo.host}:${connectionInfo.port}/namespaces/${namespace}/tables`;
+	let query = `${getHostURI(connectionInfo)}/namespaces/${namespace}/tables`;
 
 	return fetchRequest(query, connectionInfo).then(res => {
 		return cb(null, res);
@@ -266,14 +247,16 @@ function prepareDataItems(namespaces, items){
 	}); 
 }
 
+function getTableSchema(namespace, table, connectionInfo, logger, cb){
+	let query = `${getHostURI(connectionInfo)}/${table}/schema`;
 
-
-
-
-
-
-
-
+	return fetchRequest(query, connectionInfo, logger).then(res => {
+		return cb(null, res);
+	})
+	.catch(err => {
+		return cb(err);
+	});
+}
 
 
 
