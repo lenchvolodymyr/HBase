@@ -4,6 +4,7 @@
   "description": "",
   "author": "Hackolade",
   "dependencies": {
+    "async": "^2.6.0",
     "hbase": "^0.3.0",
     "node-fetch": "2.1.1"
   }

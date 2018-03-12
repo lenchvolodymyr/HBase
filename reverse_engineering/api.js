@@ -1,7 +1,7 @@
 'use strict';
 
-//const async = require('async');
-//const _ = require('lodash');
+const async = require('async');
+const _ = require('lodash');
 const hbase = require('hbase');
 const fetch = require('node-fetch');
 
@@ -94,12 +94,21 @@ module.exports = {
 				return cb(err);
 			}
 
-			getNamespacesList(connectionInfo, logger, (err, res) => {
+
+			getNamespacesList(connectionInfo, (err, res) => {
 				if(err){
-					console.log(err);
+					logger.log('error', err);
+					cb(err);
 				} else {
-					res = res.Namespace;
-					cb(err, res);
+					let namespaces = res.Namespace;
+					logger.log('info', {namespaces});
+
+					async.map(namespaces, (namespace, callback) => {
+						getTablesList(connectionInfo, namespace, callback);
+					}, (err, items) => {
+						items = prepareDataItems(namespaces, items);
+						cb(err, items);
+					});
 				}
 			});
 		});
@@ -184,6 +193,7 @@ module.exports = {
 	}
 };
 
+
 function getRequestOptions(connectionInfo){
 	let headers = {
 		'Cache-Control': 'no-cache',
@@ -233,6 +243,40 @@ function getNamespacesList(connectionInfo, cb){
 		return cb(err);
 	});
 }
+
+function getTablesList(connectionInfo, namespace, cb){
+	let query = `http://${connectionInfo.host}:${connectionInfo.port}/namespaces/${namespace}/tables`;
+
+	return fetchRequest(query, connectionInfo).then(res => {
+		return cb(null, res);
+	})
+	.catch(err => {
+		return cb(err);
+	});
+}
+
+function prepareDataItems(namespaces, items){
+	return items.map((item, index) => {
+		return {
+			dbName: namespaces[index],
+			dbCollections: item.table.map(table => {
+				return table.name;
+			})
+		};
+	}); 
+}
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 function readCollectionById(dbLink, collectionId, callback) {
