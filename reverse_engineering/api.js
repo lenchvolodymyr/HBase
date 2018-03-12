@@ -7,39 +7,35 @@ const hbase = require('hbase');
 var client = null;
 
 module.exports = {
-	connect: function(connectionInfo, cb){
-		let options = {
-			host: connectionInfo.host,
-			port: connectionInfo.post
-		};
+	connect: function(connectionInfo, logger, cb){
+		if(!client){
+			let options = {
+				host: connectionInfo.host,
+				port: connectionInfo.post
+			};
 
-		client = hbase({ options });
-		client.version( function( error, version ){
-		  if(error){
-		  	console.log(error);
-		  	return cb(error);
-		  }
-		  console.log( version );
-		  return cb(true)
-		});
+			client = hbase({ options });
+			return cb();
+		}
+		return cb();
 	},
 
 	disconnect: function(connectionInfo, cb){
-		cb()
+		cb();
 	},
 
 	testConnection: function(connectionInfo, logger, cb){
-		let options = {
-			host: connectionInfo.host,
-			port: connectionInfo.post
-		};
-
-		client = hbase({ options });
-		client.version( function( error, version ){
-			if(error){
-				return cb(error);
+		this.connect(connectionInfo, logger, err => {
+			if(err){
+				return cb(err);
 			}
-			return cb(null)
+
+			client.version((error, version) => {
+				if(error){
+					return cb(error);
+				}
+				return cb(null)
+			});
 		});
 	},
 
