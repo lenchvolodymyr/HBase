@@ -3,6 +3,7 @@
 //const async = require('async');
 //const _ = require('lodash');
 const hbase = require('hbase');
+const fetch = require('node-fetch');
 
 var client = null;
 
@@ -39,15 +40,8 @@ module.exports = {
 		});
 	},
 
-	getDatabases: function(connectionInfo, cb){
-		listDatabases((err, dbs) => {
-			if(err){
-				console.log(err);
-			} else {
-				dbs = dbs.map(item => item.id);
-				cb(err, dbs);
-			}
-		});
+	getDatabases: function(connectionInfo, logger, cb){
+		
 	},
 
 	getDocumentKinds: function(connectionInfo, cb) {
@@ -94,21 +88,20 @@ module.exports = {
 		});
 	},
 
-	getDbCollectionsNames: function(connectionInfo, cb) {
-		readDatabaseById(connectionInfo.database, (err, database) => {
+	getDbCollectionsNames: function(connectionInfo, logger, cb) {
+		this.connect(connectionInfo, logger, err => {
 			if(err){
-				console.log(err);
-			} else {
-				listCollections(database._self, (err, collections) => {
-					if(err){
-						console.log(err);
-						cb(err)
-					} else {
-						let collectionNames = collections.map(item => item.id);
-						handleBucket(connectionInfo, collectionNames, database, cb);
-					}
-				});
+				return cb(err);
 			}
+
+			getNamespacesList(connectionInfo, logger, (err, res) => {
+				if(err){
+					console.log(err);
+				} else {
+					res = res.Namespace;
+					cb(err, res);
+				}
+			});
 		});
 	},
 
@@ -190,6 +183,56 @@ module.exports = {
 		});
 	}
 };
+
+function getRequestOptions(connectionInfo){
+	let headers = {
+		'Cache-Control': 'no-cache',
+		'Accept': 'application/json'
+	};
+
+	if(connectionInfo.useAuth && connectionInfo.userName && connectionInfo.password){
+		let credentials = `${connectionInfo.userName}:${connectionInfo.password}`;
+		let encodedCredentials = new Buffer(credentials).toString('base64');
+		headers.Authorization = `Basic ${encodedCredentials}`;
+	}
+
+	return {
+		'method': 'GET',
+		'headers': headers
+	};
+}
+
+function fetchRequest(query, connectionInfo){
+	let options = getRequestOptions(connectionInfo);
+	let response;
+
+	return fetch(query, options)
+		.then(res => {
+			response = res;
+			return res.text();
+		})
+		.then(body => {
+			body = JSON.parse(body);
+
+			if(!response.ok){
+				throw {
+					message: response.statusText, code: response.status, description: body
+				};
+			}
+			return body;
+		});
+}
+
+function getNamespacesList(connectionInfo, cb){
+	let query = `http://${connectionInfo.host}:${connectionInfo.port}/namespaces`;
+
+	return fetchRequest(query, connectionInfo).then(res => {
+		return cb(null, res);
+	})
+	.catch(err => {
+		return cb(err);
+	});
+}
 
 
 function readCollectionById(dbLink, collectionId, callback) {
