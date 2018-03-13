@@ -85,86 +85,30 @@ module.exports = {
 						return tableCallback(err);
 					}
 
-					return tableCallback(null, { table, schema });
+					scanDocuments(table, (err, rows) => {
+						if(err){
+							logger.log('error', err);
+							return tableCallback(err);
+						}
+
+						let documents = convertRowsToJsonDocuments(rows);
+						let documentsPackage = {
+							dbName: namespace,
+							collectionName: table,
+							documents,
+							schema
+						};
+
+						return tableCallback(null, documentsPackage);
+					});
 				});
 			}, (err, items) => {
-				logger.log('error', err);
-				return callback(err, { namespace, schemas: items });
+				if(err){
+					logger.log('error', err);
+				}
+				return callback(err, items);
 			});
 		}, cb);
-
-		
-
-		// readDatabaseById(data.database, (err, database) => {
-		// 	if(err){
-		// 		console.log(err);
-		// 	} else {
-		// 		async.map(bucketList, (bucketName, collItemCallback) => {
-		// 			readCollectionById(database.id, bucketName, (err, collection) => {
-		// 				if(err){
-		// 					console.log(err);
-		// 				} else {
-		// 					getOfferType(collection, (err, info) => {
-		// 						if(err){
-
-		// 						} else {
-		// 							let bucketInfo = {
-		// 								throughput: info.content.offerThroughput,
-		// 								rump: info.content.offerIsRUPerMinuteThroughputEnabled ? 'OFF' : 'On'
- 	// 								};
-
- 	// 								let indexes = getIndexes(collection.indexingPolicy);
-
-		// 							listDocuments(collection._self, size, (err, documents) => {
-		// 								if(err){
-		// 									console.log(err);
-		// 								} else {
-		// 									documents = filterDocuments(documents);
-		// 									let documentKindName = data.documentKinds[collection.id].documentKindName || '*';
-		// 									let docKindsList = data.collectionData.collections[bucketName];
-		// 									let collectionPackages = [];
-
-		// 									if(documentKindName !== '*'){
-		// 										docKindsList.forEach(docKindItem => {
-		// 											let newArrayDocuments = documents.filter((item) => {
-		// 												return item[documentKindName] === docKindItem;
-		// 											});
-
-		// 											let documentsPackage = {
-		// 												dbName: bucketName,
-		// 												collectionName: docKindItem,
-		// 												documents: newArrayDocuments || [],
-		// 												indexes: [],
-		// 												bucketIndexes: indexes,
-		// 												views: [],
-		// 												validation: false,
-		// 												docType: documentKindName,
-		// 												bucketInfo
-		// 											};
-
-		// 											if(fieldInference.active === 'field'){
-		// 												documentsPackage.documentTemplate = documents[0] || null;
-		// 											}
-
-		// 											collectionPackages.push(documentsPackage)
-		// 										});
-		// 									}
-
-		// 									collItemCallback(err, collectionPackages);
-		// 								}
-		// 							});
-		// 						}
-		// 					})
-		// 				}
-		// 			});
-		// 		}, (err, items) => {
-		// 			if(err){
-		// 				console.log(err);
-		// 			}
-		// 			return cb(err, items);
-		// 		});
-		// 	}
-		// });
 	}
 };
 
@@ -202,7 +146,6 @@ function fetchRequest(query, connectionInfo, logger){
 			return res.text();
 		})
 		.then(body => {
-			if(logger) logger.log('info', {schema: body})
 			body = JSON.parse(body);
 
 			if(!response.ok){
@@ -258,6 +201,51 @@ function getTableSchema(namespace, table, connectionInfo, logger, cb){
 	});
 }
 
+function scanDocuments(table, cb){
+	client
+	.table(table)
+	.scan(cb);
+}
+
+function convertRowsToJsonDocuments(rows){
+	let data = {
+		hashTable: {},
+		documents: []
+	};
+
+	rows.forEach(item => {
+		if(!data.hashTable[item.key]){
+			let doc = { key: item.key };
+			doc = handleColumn(doc, item);
+			data.documents.push(doc);
+			data.hashTable[item.key] = data.documents.length - 1;
+		}
+
+		let index = data.hashTable[item.key];
+		data.documents[index] = handleColumn(data.documents[index], item);
+	});
+
+	return data.documents;	
+}
+
+function handleColumn(doc, item){
+	let columnData = item.column.split(':');
+	let columnFamily = columnData[0];
+	let columnQualifier = columnData[1];
+
+	if(!doc[columnFamily]){
+		doc[columnFamily] = {};
+	}
+
+	doc[columnFamily] = {
+		[columnQualifier]: {
+			value: item.$,
+			timestamp: item.timestamp
+		}
+	};
+
+	return doc;
+}
 
 
 
