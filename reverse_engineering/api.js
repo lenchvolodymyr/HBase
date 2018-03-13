@@ -91,12 +91,17 @@ module.exports = {
 							return tableCallback(err);
 						}
 
-						let documents = convertRowsToJsonDocuments(rows);
+
+						let handledRows = handleRows(rows);
+
 						let documentsPackage = {
 							dbName: namespace,
 							collectionName: table,
-							documents,
-							schema
+							emptyBucket: !handledRows.documents.length,
+							documents: handledRows.documents,
+							validation: {
+								jsonSchema: handledRows.schema
+							}
 						};
 
 						return tableCallback(null, documentsPackage);
@@ -207,44 +212,61 @@ function scanDocuments(table, cb){
 	.scan(cb);
 }
 
-function convertRowsToJsonDocuments(rows){
+function handleRows(rows){
 	let data = {
 		hashTable: {},
-		documents: []
+		documents: [],
+		schema: {
+			properties: {}
+		}
 	};
 
 	rows.forEach(item => {
 		if(!data.hashTable[item.key]){
-			let doc = { key: item.key };
-			doc = handleColumn(doc, item);
-			data.documents.push(doc);
+			let handledColumn = handleColumn(item);
+			data.schema.properties = handledColumn.schema;
+			data.documents.push(handledColumn.doc);
 			data.hashTable[item.key] = data.documents.length - 1;
 		}
 
 		let index = data.hashTable[item.key];
-		data.documents[index] = handleColumn(data.documents[index], item);
+		let handledColumn = handleColumn(item, data.documents[index], data.schema.properties);
+		data.documents[index] = handledColumn.doc;
+		data.schema.properties = handledColumn.schema;
 	});
 
-	return data.documents;	
+	return data;	
 }
 
-function handleColumn(doc, item){
+function handleColumn(item, doc = {}, schema = {}){
 	let columnData = item.column.split(':');
 	let columnFamily = columnData[0];
 	let columnQualifier = columnData[1];
 
 	if(!doc[columnFamily]){
 		doc[columnFamily] = {};
+		schema[columnFamily] = {
+			type: 'colFam',
+			properties: {}
+		};
 	}
 
-	doc[columnFamily] = {
-		[columnQualifier]: {
-			value: item.$,
-			timestamp: item.timestamp
+	doc[columnFamily][columnQualifier] = {
+		value: item.$,
+		'^Timestamp[0-9]+$': item.timestamp
+	};
+
+	schema[columnFamily].properties[columnQualifier] = {
+		type: 'colQual',
+		properties: {
+			'^Timestamp[0-9]+$': {
+				type: 'byte',
+				isPatternField: true
+			}
 		}
 	};
 
-	return doc;
+	return { doc, schema };
 }
 
 
