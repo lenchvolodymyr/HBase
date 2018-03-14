@@ -93,6 +93,8 @@ module.exports = {
 
 
 						let handledRows = handleRows(rows);
+						let customSchema = handledRows.schema;
+						customSchema = setTTL(customSchema, schema);
 
 						let documentsPackage = {
 							dbName: namespace,
@@ -100,7 +102,7 @@ module.exports = {
 							emptyBucket: !handledRows.documents.length,
 							documents: handledRows.documents,
 							validation: {
-								jsonSchema: handledRows.schema
+								jsonSchema: customSchema
 							}
 						};
 
@@ -270,6 +272,32 @@ function handleColumn(item, schema, doc = {}){
 	};
 
 	return { doc, schema };
+}
+
+function parseSchema(schema){
+	schema = schema.replace('=>', ':');
+
+	try {
+		schema = JSON.parse(schema);
+	} catch (err) {
+		schema = null;
+	}
+
+	return schema;
+}
+
+function setTTL(customSchema, schema){
+	schema.ColumnSchema.forEach(item => {
+		if (!customSchema.properties[item.name]){
+			customSchema.properties[item.name] = {
+				type: 'colFam'
+			};
+		}
+
+		customSchema.properties[item.name].ttl = item.TTL;
+	});
+
+	return customSchema;
 }
 
 
