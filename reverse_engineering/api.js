@@ -223,14 +223,14 @@ function handleRows(rows){
 
 	rows.forEach(item => {
 		if(!data.hashTable[item.key]){
-			let handledColumn = handleColumn(item);
+			let handledColumn = handleColumn(item, data.schema.properties);
 			data.schema.properties = handledColumn.schema;
 			data.documents.push(handledColumn.doc);
 			data.hashTable[item.key] = data.documents.length - 1;
 		}
 
 		let index = data.hashTable[item.key];
-		let handledColumn = handleColumn(item, data.documents[index], data.schema.properties);
+		let handledColumn = handleColumn(item, data.schema.properties, data.documents[index]);
 		data.documents[index] = handledColumn.doc;
 		data.schema.properties = handledColumn.schema;
 	});
@@ -238,13 +238,16 @@ function handleRows(rows){
 	return data;	
 }
 
-function handleColumn(item, doc = {}, schema = {}){
+function handleColumn(item, schema, doc = {}){
 	let columnData = item.column.split(':');
 	let columnFamily = columnData[0];
 	let columnQualifier = columnData[1];
 
 	if(!doc[columnFamily]){
 		doc[columnFamily] = {};
+	}
+
+	if(!schema[columnFamily]){
 		schema[columnFamily] = {
 			type: 'colFam',
 			properties: {}
