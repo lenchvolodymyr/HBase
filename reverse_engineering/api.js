@@ -4,6 +4,7 @@ const async = require('async');
 const _ = require('lodash');
 const hbase = require('hbase');
 const fetch = require('node-fetch');
+const versions = require('../package.json').contributes.target.versions;
 
 var client = null;
 var state = {
@@ -13,9 +14,10 @@ var state = {
 module.exports = {
 	connect: function(connectionInfo, logger, cb){
 		if(!client){
+			logger.log('info', connectionInfo)
 			let options = {
 				host: connectionInfo.host,
-				port: connectionInfo.post
+				port: connectionInfo.port
 			};
 
 			client = hbase({ options });
@@ -25,20 +27,23 @@ module.exports = {
 	},
 
 	disconnect: function(connectionInfo, cb){
+		client = null;
 		cb();
 	},
 
 	testConnection: function(connectionInfo, logger, cb){
 		this.connect(connectionInfo, logger, err => {
 			if(err){
+				logger.log('error', err);
 				return cb(err);
 			}
 
-			client.version((error, version) => {
-				if(error){
-					return cb(error);
-				}
-				return cb(null)
+			getClusterVersion(connectionInfo).then(version => {
+				return cb();
+			})
+			.catch(err => {
+				logger.log('error', err);
+				return cb(err);
 			});
 		});
 	},
@@ -48,24 +53,27 @@ module.exports = {
 			if(err){
 				return cb(err);
 			}
-
 			state.connectionInfo = connectionInfo;
 
+			getNamespacesList(connectionInfo).then(result => {
+				let namespaces = result.Namespace;
 
-			getNamespacesList(connectionInfo, (err, res) => {
-				if(err){
-					logger.log('error', err);
-					cb(err);
-				} else {
-					let namespaces = res.Namespace;
-
-					async.map(namespaces, (namespace, callback) => {
-						getTablesList(connectionInfo, namespace, callback);
-					}, (err, items) => {
-						items = prepareDataItems(namespaces, items);
-						cb(err, items);
-					});
-				}
+				async.map(namespaces, (namespace, callback) => {
+					getTablesList(connectionInfo, namespace)
+						.then(res => {
+							return callback(null, res);
+						})
+						.catch(err => {
+							return callback(err);
+						});
+				}, (err, items) => {
+					items = prepareDataItems(namespaces, items);
+					cb(err, items);
+				});
+			})
+			.catch(err => {
+				logger.log('error', err);
+				cb(err);
 			});
 		});
 	},
@@ -74,27 +82,28 @@ module.exports = {
 		let { recordSamplingSettings, fieldInference } = data;
 		let size = getSampleDocSize(1000, recordSamplingSettings) || 1000;
 		let namespaces = data.collectionData.dataBaseNames;
+		let info = { 
+			host: state.connectionInfo.host,
+			port: state.connectionInfo.port
+		};
 
 		async.map(namespaces, (namespace, callback) => {
 			let tables = data.collectionData.collections[namespace];
 
 			async.map(tables, (table, tableCallback) => {
-				getTableSchema(namespace, table, state.connectionInfo, (err, schema) => {
-					if(err){
-						logger.log('error', err);
-						return tableCallback(err);
-					}
-
-					scanDocuments(table, (err, rows) => {
-						if(err){
-							logger.log('error', err);
-							return tableCallback(err);
-						}
-
-
+				getClusterVersion(state.connectionInfo)
+					.then(version => {
+						info.version = handleVersion(version, versions) || '';
+						return getTableSchema(namespace, table, state.connectionInfo)
+					})
+					.then(schema => {
+						info.schema = schema;
+						return scanDocuments(table);
+					})
+					.then(rows => {
 						let handledRows = handleRows(rows);
 						let customSchema = handledRows.schema;
-						customSchema = setTTL(customSchema, schema);
+						customSchema = setTTL(customSchema, info.schema);
 
 						let documentsPackage = {
 							dbName: namespace,
@@ -107,15 +116,21 @@ module.exports = {
 						};
 
 						return tableCallback(null, documentsPackage);
+					})
+					.catch(err => {
+						logger.log('error', err);
+						return tableCallback(err);
 					});
-				});
 			}, (err, items) => {
 				if(err){
 					logger.log('error', err);
 				}
 				return callback(err, items);
 			});
-		}, cb);
+		}, (err, res) => {
+			delete info.schema;
+			cb(err, res, info)
+		});
 	}
 };
 
@@ -164,25 +179,19 @@ function fetchRequest(query, connectionInfo){
 		});
 }
 
-function getNamespacesList(connectionInfo, cb){
+function getNamespacesList(connectionInfo){
 	let query = `${getHostURI(connectionInfo)}/namespaces`;
 
 	return fetchRequest(query, connectionInfo).then(res => {
-		return cb(null, res);
-	})
-	.catch(err => {
-		return cb(err);
+		return res;
 	});
 }
 
-function getTablesList(connectionInfo, namespace, cb){
+function getTablesList(connectionInfo, namespace){
 	let query = `${getHostURI(connectionInfo)}/namespaces/${namespace}/tables`;
 
 	return fetchRequest(query, connectionInfo).then(res => {
-		return cb(null, res);
-	})
-	.catch(err => {
-		return cb(err);
+		return res;
 	});
 }
 
@@ -197,14 +206,11 @@ function prepareDataItems(namespaces, items){
 	}); 
 }
 
-function getTableSchema(namespace, table, connectionInfo, cb){
+function getTableSchema(namespace, table, connectionInfo){
 	let query = `${getHostURI(connectionInfo)}/${table}/schema`;
 
 	return fetchRequest(query, connectionInfo).then(res => {
-		return cb(null, res);
-	})
-	.catch(err => {
-		return cb(err);
+		return res;
 	});
 }
 
@@ -212,17 +218,21 @@ function getClusterVersion(connectionInfo){
 	let query = `${getHostURI(connectionInfo)}/version/cluster`;
 
 	return fetchRequest(query, connectionInfo).then(res => {
-		return cb(null, res);
-	})
-	.catch(err => {
-		return cb(err);
+		return res;
 	});
 }
 
-function scanDocuments(table, cb){
-	client
-	.table(table)
-	.scan(cb);
+function scanDocuments(table){
+	return new Promise((resolve, reject) => {
+		client
+		.table(table)
+		.scan((err, rows) => {
+			if(err){
+				reject(err);
+			}
+			resolve(rows);
+		});
+	});
 }
 
 function handleRows(rows){
@@ -316,4 +326,15 @@ function getSampleDocSize(count, recordSamplingSettings) {
 	return (recordSamplingSettings.active === 'absolute')
 		? recordSamplingSettings.absolute.value
 			: Math.round( count/100 * per);
+}
+
+function handleVersion(version, versions){
+	return versions.find(item => {
+		let sItem = item.split('');
+
+		sItem = sItem.map((item, index) => {
+			return item === 'x' ? version[index] : item;
+		});
+		return version	=== sItem.join('')	
+	})
 }
