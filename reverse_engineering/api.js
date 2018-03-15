@@ -79,7 +79,7 @@ module.exports = {
 			let tables = data.collectionData.collections[namespace];
 
 			async.map(tables, (table, tableCallback) => {
-				getTableSchema(namespace, table, state.connectionInfo, logger, (err, schema) => {
+				getTableSchema(namespace, table, state.connectionInfo, (err, schema) => {
 					if(err){
 						logger.log('error', err);
 						return tableCallback(err);
@@ -143,7 +143,7 @@ function getRequestOptions(connectionInfo){
 	};
 }
 
-function fetchRequest(query, connectionInfo, logger){
+function fetchRequest(query, connectionInfo){
 	let options = getRequestOptions(connectionInfo);
 	let response;
 
@@ -197,10 +197,21 @@ function prepareDataItems(namespaces, items){
 	}); 
 }
 
-function getTableSchema(namespace, table, connectionInfo, logger, cb){
+function getTableSchema(namespace, table, connectionInfo, cb){
 	let query = `${getHostURI(connectionInfo)}/${table}/schema`;
 
-	return fetchRequest(query, connectionInfo, logger).then(res => {
+	return fetchRequest(query, connectionInfo).then(res => {
+		return cb(null, res);
+	})
+	.catch(err => {
+		return cb(err);
+	});
+}
+
+function getClusterVersion(connectionInfo){
+	let query = `${getHostURI(connectionInfo)}/version/cluster`;
+
+	return fetchRequest(query, connectionInfo).then(res => {
 		return cb(null, res);
 	})
 	.catch(err => {
