@@ -89,19 +89,21 @@ module.exports = {
 			let tables = data.collectionData.collections[namespace];
 
 			async.map(tables, (table, tableCallback) => {
+				let currentSchema;
+
 				getClusterVersion(state.connectionInfo)
 					.then(version => {
 						info.version = handleVersion(version, versions) || '';
 						return getTableSchema(namespace, table, state.connectionInfo)
 					})
 					.then(schema => {
-						info.schema = schema;
+						currentSchema = schema;
 						return scanDocuments(table);
 					})
 					.then(rows => {
 						let handledRows = handleRows(rows);
 						let customSchema = handledRows.schema;
-						customSchema = setTTL(customSchema, info.schema);
+						customSchema = setTTL(customSchema, currentSchema);
 
 						let documentsPackage = {
 							dbName: namespace,
@@ -126,7 +128,6 @@ module.exports = {
 				return callback(err, items);
 			});
 		}, (err, res) => {
-			delete info.schema;
 			cb(err, res, info)
 		});
 	}
