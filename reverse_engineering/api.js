@@ -55,9 +55,7 @@ module.exports = {
 			}
 			state.connectionInfo = connectionInfo;
 
-			getNamespacesList(connectionInfo).then(result => {
-				let namespaces = result.Namespace;
-
+			getNamespacesList(connectionInfo).then(namespaces => {
 				async.map(namespaces, (namespace, callback) => {
 					getTablesList(connectionInfo, namespace)
 						.then(res => {
@@ -183,7 +181,7 @@ function getNamespacesList(connectionInfo){
 	let query = `${getHostURI(connectionInfo)}/namespaces`;
 
 	return fetchRequest(query, connectionInfo).then(res => {
-		return res;
+		return res.Namespace.filter(item => item !== 'hbase');
 	});
 }
 
