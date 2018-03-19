@@ -20,7 +20,7 @@ module.exports = {
 				port: connectionInfo.port
 			};
 
-			client = hbase({ options });
+			client = hbase(options);
 			return cb();
 		}
 		return cb();
