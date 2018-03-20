@@ -240,7 +240,13 @@ function handleRows(rows){
 		hashTable: {},
 		documents: [],
 		schema: {
-			properties: {}
+			properties: {
+				'^[a-zA-Z0-9_.-]*$': {
+					type: 'string',
+					primaryKey: true,
+					isPatternField: true
+				}
+			}
 		}
 	};
 
