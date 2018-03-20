@@ -26,7 +26,7 @@ module.exports = {
 		return cb();
 	},
 
-	disconnect: function(connectionInfo, cb){
+	disconnect: function(cb){
 		client = null;
 		cb();
 	},
@@ -51,7 +51,9 @@ module.exports = {
 	getDbCollectionsNames: function(connectionInfo, logger, cb) {
 		this.connect(connectionInfo, logger, err => {
 			if(err){
-				return cb(err);
+				return this.disconnect(() => {
+					return cb(err);
+				});
 			}
 			state.connectionInfo = connectionInfo;
 
@@ -66,12 +68,19 @@ module.exports = {
 						});
 				}, (err, items) => {
 					items = prepareDataItems(namespaces, items);
-					cb(err, items);
+					if(err){
+						this.disconnect(() => {
+							return cb(err);
+						});
+					}
+					return cb(null, items)
 				});
 			})
 			.catch(err => {
 				logger.log('error', err);
-				cb(err);
+				this.disconnect(() => {
+					return cb(err);
+				});
 			});
 		});
 	},
@@ -128,7 +137,7 @@ module.exports = {
 				return callback(err, items);
 			});
 		}, (err, res) => {
-			cb(err, res, info)
+			return cb(err, res, info);
 		});
 	}
 };
@@ -278,21 +287,20 @@ function handleColumn(item, schema, doc = {}){
 
 	doc[columnFamily][columnQualifier] = {
 		value: item.$,
-		'^Timestamp[0-9]+$': item.timestamp
+		'timestamp': item.timestamp
 	};
 
 	schema[columnFamily].properties[columnQualifier] = {
-		type: 'colQual',
-		properties: {
-			'^Timestamp[0-9]+$': {
-				type: 'byte',
-				isPatternField: true
-			}
-		}
+		type: 'colQual'
 	};
 
 	return { doc, schema };
 }
+
+function getTimestampField(timestamp){
+	
+}
+
 
 function parseSchema(schema){
 	schema = schema.replace('=>', ':');

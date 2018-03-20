@@ -1,6 +1,6 @@
 {
 	"extension": "txt",
 	"filterName": "Plain text",
-	"namePrefix": "Elasticsearch Mapping",
-	"hasUpdateScript": true
+	"namePrefix": "HBase script",
+	"hasUpdateScript": false
 }
