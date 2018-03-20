@@ -7,9 +7,6 @@ const fetch = require('node-fetch');
 const versions = require('../package.json').contributes.target.versions;
 
 var client = null;
-var state = {
-	connectionInfo: null
-};
 
 module.exports = {
 	connect: function(connectionInfo, logger, cb){
@@ -55,7 +52,6 @@ module.exports = {
 					return cb(err);
 				});
 			}
-			state.connectionInfo = connectionInfo;
 
 			getNamespacesList(connectionInfo).then(namespaces => {
 				async.map(namespaces, (namespace, callback) => {
@@ -90,8 +86,8 @@ module.exports = {
 		let size = getSampleDocSize(1000, recordSamplingSettings) || 1000;
 		let namespaces = data.collectionData.dataBaseNames;
 		let info = { 
-			host: state.connectionInfo.host,
-			port: state.connectionInfo.port
+			host: data.connectionInfo.host,
+			port: data.connectionInfo.port
 		};
 
 		async.map(namespaces, (namespace, callback) => {
@@ -100,10 +96,10 @@ module.exports = {
 			async.map(tables, (table, tableCallback) => {
 				let currentSchema;
 
-				getClusterVersion(state.connectionInfo)
+				getClusterVersion(data.connectionInfo)
 					.then(version => {
 						info.version = handleVersion(version, versions) || '';
-						return getTableSchema(namespace, table, state.connectionInfo)
+						return getTableSchema(namespace, table, data.connectionInfo)
 					})
 					.then(schema => {
 						currentSchema = schema;
