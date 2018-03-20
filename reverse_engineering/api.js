@@ -48,9 +48,7 @@ module.exports = {
 	getDbCollectionsNames: function(connectionInfo, logger, cb) {
 		this.connect(connectionInfo, logger, err => {
 			if(err){
-				return this.disconnect(() => {
-					return cb(err);
-				});
+				return cb(err);
 			}
 
 			getNamespacesList(connectionInfo).then(namespaces => {
@@ -64,19 +62,12 @@ module.exports = {
 						});
 				}, (err, items) => {
 					items = prepareDataItems(namespaces, items);
-					if(err){
-						this.disconnect(() => {
-							return cb(err);
-						});
-					}
-					return cb(null, items)
+					return cb(err, items);
 				});
 			})
 			.catch(err => {
 				logger.log('error', err);
-				this.disconnect(() => {
-					return cb(err);
-				});
+				return cb(err);
 			});
 		});
 	},
