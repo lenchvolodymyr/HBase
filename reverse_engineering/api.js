@@ -99,7 +99,7 @@ module.exports = {
 					})
 					.then(schema => {
 						currentSchema = schema;
-						return scanDocuments(table);
+						return scanDocuments(namespace, table);
 					})
 					.then(rows => {
 						let handledRows = handleRows(rows);
@@ -222,10 +222,10 @@ function getClusterVersion(connectionInfo){
 	});
 }
 
-function scanDocuments(table){
+function scanDocuments(namespace, table){
 	return new Promise((resolve, reject) => {
 		client
-		.table(table)
+		.table(`${namespace}:${table}`)
 		.scan((err, rows) => {
 			if(err){
 				reject(err);
