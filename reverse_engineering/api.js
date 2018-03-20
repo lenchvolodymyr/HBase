@@ -7,6 +7,9 @@ const fetch = require('node-fetch');
 const versions = require('../package.json').contributes.target.versions;
 
 var client = null;
+var state = {
+	connectionInfo: {}
+};
 
 module.exports = {
 	connect: function(connectionInfo, logger, cb){
@@ -25,6 +28,7 @@ module.exports = {
 
 	disconnect: function(cb){
 		client = null;
+		state.connectionInfo = {};
 		cb();
 	},
 
@@ -50,6 +54,7 @@ module.exports = {
 			if(err){
 				return cb(err);
 			}
+			state.connectionInfo = connectionInfo;
 
 			getNamespacesList(connectionInfo).then(namespaces => {
 				async.map(namespaces, (namespace, callback) => {
@@ -77,8 +82,8 @@ module.exports = {
 		let size = getSampleDocSize(1000, recordSamplingSettings) || 1000;
 		let namespaces = data.collectionData.dataBaseNames;
 		let info = { 
-			host: data.connectionInfo.host,
-			port: data.connectionInfo.port
+			host: state.connectionInfo.host,
+			port: state.connectionInfo.port
 		};
 
 		async.map(namespaces, (namespace, callback) => {
@@ -87,10 +92,10 @@ module.exports = {
 			async.map(tables, (table, tableCallback) => {
 				let currentSchema;
 
-				getClusterVersion(data.connectionInfo)
+				getClusterVersion(state.connectionInfo)
 					.then(version => {
 						info.version = handleVersion(version, versions) || '';
-						return getTableSchema(namespace, table, data.connectionInfo)
+						return getTableSchema(namespace, table, state.connectionInfo)
 					})
 					.then(schema => {
 						currentSchema = schema;
@@ -272,22 +277,42 @@ function handleColumn(item, schema, doc = {}){
 		};
 	}
 
-	doc[columnFamily][columnQualifier] = {
-		value: item.$,
-		'timestamp': item.timestamp
-	};
+	if(!schema[columnFamily].properties[columnQualifier]){
+		schema[columnFamily].properties[columnQualifier] = {
+			type: 'colQual',
+			properties: {
+				value: {
+					type: getValueType(item.$)
+				}
+			}
+		};
+	}
 
-	schema[columnFamily].properties[columnQualifier] = {
-		type: 'colQual'
+	doc[columnFamily][columnQualifier] = {
+		value: getValue(item.$, schema[columnFamily].properties[columnQualifier]),
+		'timestamp': item.timestamp
 	};
 
 	return { doc, schema };
 }
 
-function getTimestampField(timestamp){
-	
+function getValueType(value){
+	try {
+		value = JSON.parse(value);
+		return _.isArray(value) ? 'array' : 'object' 
+	} catch (err) {
+		return 'byte';
+	}
 }
 
+function getValue(value, colQual){
+	let type = colQual.properties.value.type;
+	
+	if(type === 'object' || type === 'array'){
+		return JSON.parse(value);
+	}
+	return value;
+}
 
 function parseSchema(schema){
 	schema = schema.replace('=>', ':');
