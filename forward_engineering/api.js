@@ -1,19 +1,35 @@
 module.exports = {
 	generateScript(data, logger, cb) {
-		const { jsonSchema, modelData, containerData, entityData, isUpdateScript } = data;
-		let columnFailies = this.getColumnFamilies(entityData);
+		let { jsonSchema, entityData } = data;
+
+		try {
+			jsonSchema = JSON.parse(jsonSchema);
+		} catch (err) {
+			return cb(err)
+		}
+		
+		let columnFailies = this.getColumnFamilies(jsonSchema.properties);
 		let script = `create '${entityData.collectionName.toLowerCase()}'`;
 		
 		columnFailies.forEach(item => {
 			script = `${script}, '${item}'`;
 		});
 
-		cb(null, script);
+		return cb(null, script);
 	},
 
-	getColumnFamilies(entity){
-		return entity.properties.filter(item => {
-			return item.type === 'colFam';
-		}).map(item => item.name);
+	getColumnFamilies(props = {}){
+		let columnFamilies = [];
+		for(let prop in props){
+			if(props[prop] && props[prop].type === 'colFam'){
+				columnFamilies.push(prop);
+			}
+		}
+
+		if(!columnFamilies.length){
+			columnFamilies.push('<columnFaimily>');
+		}
+
+		return columnFamilies;
 	}
 };
