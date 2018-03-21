@@ -144,6 +144,9 @@ module.exports = {
 				return callback(err, items);
 			});
 		}, (err, res) => {
+			if(err){
+				logger.log('error', err);
+			}
 			return cb(err, res, info);
 		});
 	}
