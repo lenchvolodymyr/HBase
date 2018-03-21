@@ -342,13 +342,17 @@ function getValueType(value){
 }
 
 function getValue(value, colQual){
-	let type = colQual.properties.value.type;
-	
-	if(type === 'object' || type === 'array'){
-		return JSON.parse(value);
+	let schemaValue = colQual.properties.value;
+
+	try {
+		value = JSON.parse(value);
+		return value;
+	} catch (err) {
+		schemaValue.type === 'bity';
+		return value;
 	}
-	return value;
 }
+
 
 function parseSchema(schema){
 	schema = schema.replace('=>', ':');

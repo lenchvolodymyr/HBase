@@ -20,7 +20,7 @@
 				"inputType": "numeric"
 			}
 		]
-	},
+	}/*,
 	{
 		"lowerTab": "Authentication",
 		"structure": [
@@ -70,5 +70,5 @@
 				"inputPlaceholder": "Service principal"
 			}
 		]
-	}
+	}*/
 ]
