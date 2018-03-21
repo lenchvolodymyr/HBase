@@ -3,6 +3,7 @@
 const async = require('async');
 const _ = require('lodash');
 const hbase = require('hbase');
+//const krb5 = require ('krb5');
 const fetch = require('node-fetch');
 const versions = require('../package.json').contributes.target.versions;
 
@@ -10,15 +11,29 @@ var client = null;
 var state = {
 	connectionInfo: {}
 };
+var clientKrb = null;
 
 module.exports = {
 	connect: function(connectionInfo, logger, cb){
 		if(!client){
-			logger.log('info', connectionInfo)
+			logger.log('info', connectionInfo);
 			let options = {
 				host: connectionInfo.host,
 				port: connectionInfo.port
 			};
+
+			if(connectionInfo.principal){
+				options = setAuthData(options, connectionInfo);
+
+				// krb5(options.krb5, (err, krb) => {
+				// 	if (err) {
+				// 		return cb(err);
+				// 	}
+				// 	clientKrb = krb;
+				// 	client = hbase(options);
+				// 	return cb();
+				// });
+			}
 
 			client = hbase(options);
 			return cb();
@@ -146,10 +161,16 @@ function getRequestOptions(connectionInfo){
 		'Accept': 'application/json'
 	};
 
-	if(connectionInfo.useAuth && connectionInfo.userName && connectionInfo.password){
+	if(connectionInfo.principal){
 		let credentials = `${connectionInfo.userName}:${connectionInfo.password}`;
 		let encodedCredentials = new Buffer(credentials).toString('base64');
-		headers.Authorization = `Basic ${encodedCredentials}`;
+
+		clientKrb.token((err, token) => {
+			if (err) {
+				return { err };
+			}
+		})
+		headers.Authorization = `Negotiate ${token}`;
 	}
 
 	return {
@@ -161,6 +182,12 @@ function getRequestOptions(connectionInfo){
 function fetchRequest(query, connectionInfo){
 	let options = getRequestOptions(connectionInfo);
 	let response;
+
+	if(options.error){
+		return new Promise((reject, resolve) => {
+			reject(options.error);
+		});
+	}
 
 	return fetch(query, options)
 		.then(res => {
@@ -340,7 +367,7 @@ function setTTL(customSchema, schema){
 			};
 		}
 
-		customSchema.properties[item.name].ttl = item.TTL;
+		customSchema.properties[item.name].ttl = Number(item.TTL);
 	});
 
 	return customSchema;
@@ -362,4 +389,18 @@ function handleVersion(version, versions){
 		});
 		return version	=== sItem.join('')	
 	})
+}
+
+function setAuthData(options, connectionInfo){
+	let authParams = {
+		krb5:{
+			principal: connectionInfo.principal,
+			service_principal: connectionInfo.service_principal,
+			[connectionInfo.auth]: connectionInfo[connectionInfo.auth]
+		}
+	};
+
+	options = Object.assign(options, authParams);
+
+	return options;
 }
