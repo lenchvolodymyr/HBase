@@ -348,7 +348,7 @@ function getValue(value, colQual){
 		value = JSON.parse(value);
 		return value;
 	} catch (err) {
-		schemaValue.type === 'bity';
+		schemaValue.type = 'byte';
 		return value;
 	}
 }
