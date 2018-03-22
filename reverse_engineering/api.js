@@ -244,7 +244,7 @@ function prepareDataItems(namespaces, items){
 }
 
 function getTableSchema(namespace, table, connectionInfo){
-	let query = `${getHostURI(connectionInfo)}/${table}/schema`;
+	let query = `${getHostURI(connectionInfo)}/${namespace}:${table}/schema`;
 
 	return fetchRequest(query, connectionInfo).then(res => {
 		return res;
