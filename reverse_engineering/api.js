@@ -97,7 +97,6 @@ module.exports = {
 
 	getDbCollectionsData: function(data, logger, cb){
 		let { recordSamplingSettings, fieldInference } = data;
-		let size = getSampleDocSize(1000, recordSamplingSettings) || 1000;
 		let namespaces = data.collectionData.dataBaseNames;
 		let info = { 
 			host: state.connectionInfo.host,
@@ -120,19 +119,24 @@ module.exports = {
 						return scanDocuments(namespace, table);
 					})
 					.then(rows => {
-						let handledRows = handleRows(rows);
-						let customSchema = handledRows.schema;
-						customSchema = setColumnProps(customSchema, currentSchema);
-
 						let documentsPackage = {
 							dbName: namespace,
 							collectionName: table,
-							emptyBucket: !handledRows.documents.length,
-							documents: handledRows.documents,
-							validation: {
+							emptyBucket: true
+						};
+
+						if(rows.length){
+							let size = getSampleDocSize(rows.length, recordSamplingSettings);
+							logger.log('info', {size})
+							let handledRows = handleRows(rows, size);
+							let customSchema = setColumnProps(handledRows.schema, currentSchema);
+
+							documentsPackage.emptyBucket = false;
+							documentsPackage.documents = handledRows.documents;
+							documentsPackage.validation = {
 								jsonSchema: customSchema
 							}
-						};
+						}
 
 						return tableCallback(null, documentsPackage);
 					})
@@ -268,7 +272,7 @@ function scanDocuments(namespace, table){
 	});
 }
 
-function handleRows(rows){
+function handleRows(rows, size){
 	let data = {
 		hashTable: {},
 		documents: [],
@@ -283,7 +287,7 @@ function handleRows(rows){
 		}
 	};
 
-	rows.forEach(item => {
+	rows.slice(-size).forEach(item => {
 		if(!data.hashTable[item.key]){
 			let handledColumn = handleColumn(item, data.schema.properties);
 			data.schema.properties = handledColumn.schema;
@@ -402,9 +406,10 @@ function getBoolean(value){
 
 function getSampleDocSize(count, recordSamplingSettings) {
 	let per = recordSamplingSettings.relative.value;
-	return (recordSamplingSettings.active === 'absolute')
+	let res = (recordSamplingSettings.active === 'absolute')
 		? recordSamplingSettings.absolute.value
-			: Math.round( count/100 * per);
+		: Math.ceil( count/100 * per);
+	return count < res ? count : res;
 }
 
 function handleVersion(version, versions){
