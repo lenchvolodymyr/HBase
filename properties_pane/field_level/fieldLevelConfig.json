@@ -14,8 +14,7 @@ making sure that you maintain a proper JSON format.
 				"propertyName": "Simple text",
 				"propertyKeyword": "simpletextProp",
 				"shouldValidate": false,
-				"propertyType": "text",
-				"sampleGen": "&containerName|&entityName|&random|<value>"
+				"propertyType": "text"
 			},
 			{
 				"propertyName": "Text area",
@@ -44,8 +43,7 @@ making sure that you maintain a proper JSON format.
 				"propertyValidate": true,
 				"propertyType": "numeric",
 				"valueType": "number",
-				"allowNegative": false,
-				"sampleGen": "&containerName|&entityName|&random|<value>"
+				"allowNegative": false
 			},
 			{
 				"propertyName": "Checkbox",
@@ -91,14 +89,96 @@ making sure that you maintain a proper JSON format.
 			"dependencies",
 			"required",
 			{
+				"propertyName": "Data block encoding",
+				"propertyKeyword": "dataBlockEncoding",
+				"propertyType": "select",
+				"options": [
+					"NONE",
+					"PREFIX",
+					"DIFF",
+					"FAST_DIFF",
+					"PREFIX_TREE"
+				]
+			},
+			{
+				"propertyName": "Bloomfilter",
+				"propertyKeyword": "bloomfilter",
+				"propertyType": "select",
+				"options": [
+					"NONE",
+					"ROW",
+					"ROWCOL"
+				]
+			},
+			{
+				"propertyName": "Replication scope",
+				"propertyKeyword": "replicationScope",
+				"propertyType": "select",
+				"options": [
+					"0",
+					"1"
+				]
+			},
+			{
+				"propertyName": "Versions",
+				"propertyKeyword": "ttl",
+				"propertyValidate": true,
+				"propertyType": "numeric",
+				"valueType": "number",
+				"allowNegative": false
+			},
+			{
+				"propertyName": "Compression",
+				"propertyKeyword": "compression",
+				"propertyType": "select",
+				"options": [
+					"NONE",
+					"SNAPPY",
+					"LZO",
+					"LZ4",
+					"GZ"
+				]
+			},
+			{
 				"propertyName": "Time-to-Live",
 				"propertyKeyword": "ttl",
 				"propertyValidate": true,
 				"propertyType": "numeric",
 				"valueType": "number",
-				"allowNegative": false,
-				"sampleGen": "&containerName|&entityName|&random|<value>"
+				"allowNegative": false
 			},
+			{
+				"propertyName": "Min versions",
+				"propertyKeyword": "minVersions",
+				"propertyValidate": true,
+				"propertyType": "numeric",
+				"valueType": "number",
+				"allowNegative": false
+			},
+			{
+				"propertyName": "Kepp deleted cells",
+				"propertyKeyword": "keepDeletedCells",
+				"propertyType": "checkbox"
+			},
+			{
+				"propertyName": "Blocksize",
+				"propertyKeyword": "blocksize",
+				"propertyValidate": true,
+				"propertyType": "numeric",
+				"valueType": "number",
+				"allowNegative": false
+			},
+			{
+				"propertyName": "In memory",
+				"propertyKeyword": "inMemory",
+				"propertyType": "checkbox"
+			},
+			{
+				"propertyName": "Blockcache",
+				"propertyKeyword": "blockcache",
+				"propertyType": "checkbox"
+			},
+
 			"comments"
 		],
 		"colQual": "document",

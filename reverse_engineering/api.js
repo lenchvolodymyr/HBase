@@ -6,12 +6,15 @@ const hbase = require('hbase');
 //const krb5 = require ('krb5');
 const fetch = require('node-fetch');
 const versions = require('../package.json').contributes.target.versions;
+const colFamConfig = require('./columnFamilyConfig');
 
 var client = null;
 var state = {
 	connectionInfo: {}
 };
 var clientKrb = null;
+
+
 
 module.exports = {
 	connect: function(connectionInfo, logger, cb){
@@ -119,7 +122,7 @@ module.exports = {
 					.then(rows => {
 						let handledRows = handleRows(rows);
 						let customSchema = handledRows.schema;
-						customSchema = setTTL(customSchema, currentSchema);
+						customSchema = setColumnProps(customSchema, currentSchema);
 
 						let documentsPackage = {
 							dbName: namespace,
@@ -366,7 +369,7 @@ function parseSchema(schema){
 	return schema;
 }
 
-function setTTL(customSchema, schema){
+function setColumnProps(customSchema, schema){
 	schema.ColumnSchema.forEach(item => {
 		if (!customSchema.properties[item.name]){
 			customSchema.properties[item.name] = {
@@ -374,10 +377,27 @@ function setTTL(customSchema, schema){
 			};
 		}
 
-		customSchema.properties[item.name].ttl = Number(item.TTL);
+		if(colFamConfig && colFamConfig.length){
+			colFamConfig.forEach(prop => {
+				switch(prop.propertyType){
+					case 'number':
+						customSchema.properties[item.name][prop.propertyKeyword] = Number(item[prop.schemaKeyword]);
+						break;
+					case 'boolean':
+						customSchema.properties[item.name][prop.propertyKeyword] = getBoolean(item[prop.schemaKeyword]);
+						break;
+					default:
+						customSchema.properties[item.name][prop.propertyKeyword] = item[prop.schemaKeyword];
+				}
+			});
+		}
 	});
 
 	return customSchema;
+}
+
+function getBoolean(value){
+	return value === 'TRUE';
 }
 
 function getSampleDocSize(count, recordSamplingSettings) {
