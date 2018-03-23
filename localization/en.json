@@ -71,7 +71,7 @@
 	"MODAL_WINDOW___CANNOT_CONNECT_TO_DB": "Cannot connect to HBase",
 	"MODAL_WINDOW___SUCCESSFULLY_CONNECT_TO_DB": "Successfully connected to HBase",
 	"MODAL_WINDOW___UNABLE_CONNECT_TO_DB": "Unable to connect to HBase",
-	"MODAL_WINDOW___DB_CONNECTIONS_LIST_TITLE": "Hbase Connections",
+	"MODAL_WINDOW___DB_CONNECTIONS_LIST_TITLE": "HBase Connections",
 	"MODAL_WINDOW___DB_ENTITIES_SELECTION_TITLE": "Type selection",
 	"MODAL_WINDOW___RECORDS_MAX": "Documents max",
 	"MODAL_WINDOW___SUBDOCUMENT_IN_CHILD": "Sub-document in child",
