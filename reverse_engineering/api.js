@@ -116,7 +116,7 @@ module.exports = {
 					})
 					.then(schema => {
 						currentSchema = schema;
-						return scanDocuments(namespace, table);
+						return scanDocuments(namespace, table, recordSamplingSettings);
 					})
 					.then(rows => {
 						let documentsPackage = {
@@ -126,9 +126,8 @@ module.exports = {
 						};
 
 						if(rows.length){
-							let size = getSampleDocSize(rows.length, recordSamplingSettings);
-							logger.log('info', {size})
-							let handledRows = handleRows(rows, size);
+							//let size = getSampleDocSize(rows.length, recordSamplingSettings);
+							let handledRows = handleRows(rows);
 							let customSchema = setColumnProps(handledRows.schema, currentSchema);
 
 							documentsPackage.emptyBucket = false;
@@ -259,11 +258,21 @@ function getClusterVersion(connectionInfo){
 	});
 }
 
-function scanDocuments(namespace, table){
+function scanDocuments(namespace, table, recordSamplingSettings){
+	let options = {};
+	
+	if(recordSamplingSettings.active === 'absolute'){
+		let size = recordSamplingSettings.absolute;
+		options.filter = {
+			type: 'PageFilter',
+			value: size 
+		};
+	}
+
 	return new Promise((resolve, reject) => {
 		client
 		.table(`${namespace}:${table}`)
-		.scan((err, rows) => {
+		.scan(options, (err, rows) => {
 			if(err){
 				reject(err);
 			}

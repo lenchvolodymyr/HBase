@@ -121,7 +121,7 @@ making sure that you maintain a proper JSON format.
 			},
 			{
 				"propertyName": "Versions",
-				"propertyKeyword": "ttl",
+				"propertyKeyword": "versions",
 				"propertyValidate": true,
 				"propertyType": "numeric",
 				"valueType": "number",

@@ -15,7 +15,7 @@ module.exports = [
 		"propertyType": "string"
 	},
 	{
-		"propertyKeyword": "ttl",
+		"propertyKeyword": "versions",
 		"schemaKeyword": "VERSIONS",
 		"propertyType": "number"
 	},
