@@ -262,7 +262,7 @@ function scanDocuments(namespace, table, recordSamplingSettings){
 	let options = {};
 	
 	if(recordSamplingSettings.active === 'absolute'){
-		let size = recordSamplingSettings.absolute;
+		let size = recordSamplingSettings.absolute.value;
 		options.filter = {
 			type: 'PageFilter',
 			value: size 
