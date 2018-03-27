@@ -1,0 +1,6 @@
+{
+	"extension": "txt",
+	"filterName": "Plain text",
+	"namePrefix": "HBase script",
+	"hasUpdateScript": false
+}

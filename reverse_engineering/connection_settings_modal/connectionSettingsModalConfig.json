@@ -20,5 +20,55 @@
 				"inputType": "numeric"
 			}
 		]
-	}
+	}/*,
+	{
+		"lowerTab": "Authentication",
+		"structure": [
+			{
+				"inputLabel": "Authentication",
+				"inputKeyword": "authType",
+				"inputType": "select",
+				"options": [{
+					"value": "password",
+					"label": "password"
+				}, {
+					"value": "keytab",
+					"label": "keytab file"
+				}],
+				"defaultValue": "password"
+			},
+			{
+				"inputLabel": "Principal",
+				"inputKeyword": "principal",
+				"inputType": "text",
+				"inputPlaceholder": "principal"
+				
+			},
+			{
+				"inputLabel": "Password",
+				"inputKeyword": "password",
+				"inputType": "password",
+				"dependency": {
+					"key": "authType",
+					"value": "password"
+				}
+			},
+			{
+				"inputLabel": "Keytab file",
+				"inputKeyword": "keytab",
+				"inputType": "file",
+				"extensions": ["pem", "crt", "key"],
+				"dependency": {
+					"key": "authType",
+					"value": "keytab"
+				}
+			},
+			{
+				"inputLabel": "Service principal",
+				"inputKeyword": "service_principal",
+				"inputType": "text",
+				"inputPlaceholder": "Service principal"
+			}
+		]
+	}*/
 ]
