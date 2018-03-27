@@ -201,30 +201,23 @@ making sure that you maintain a proper JSON format.
 			"format",
 			"enum",
 			"sample",
-			"comments"
-		],
-		"number": [
-			"name",
-			"schemaId",
-			"type",
-			"description",
-			"dependencies",
-			"required",
-			"primaryKey",
-			"foreignCollection",
-			"foreignField",
-			"relationshipType",
-			"default",
-			"unit",
-			"minimum",
-			"exclusiveMinimum",
-			"maximum",
-			"exclusiveMaximum",
-			"multipleOf",
-			"divisibleBy",
-			"enum",
-			"sample",
-			"comments"
+			"comments",
+			{
+				"propertyName": "Other Attribute",
+				"propertyKeyword": "otherAttrib",
+				"shouldValidate": false,
+				"propertyType": "text",
+				"arrayItemDisabled": true,
+				"enableForReference": true,
+				"disabledOnCondition": [{
+						"key": "key",
+						"value": true
+					}, {
+						"key": "documentKind",
+						"value": true
+					}
+				]
+			}
 		],
 		"number": [
 			"name",
