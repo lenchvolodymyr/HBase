@@ -201,6 +201,7 @@ making sure that you maintain a proper JSON format.
 			"format",
 			"enum",
 			"sample",
+			"comments",
 			{
 				"propertyName": "Other Attribute",
 				"propertyKeyword": "otherAttrib",
@@ -216,8 +217,7 @@ making sure that you maintain a proper JSON format.
 						"value": true
 					}
 				]
-			},
-			"comments"
+			}
 		],
 		"number": [
 			"name",
