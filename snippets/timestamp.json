@@ -1,10 +1,18 @@
 {
 	"name": "timestamp",
-	"parentType": "document",
+	"parentType": "array",
 	"properties": [{
-		"name": "^Timestamp[0-9]+$",
-		"type": "byte",
-		"isPatternField": true,
-		"sampleName": "Timestamp1"
+		"type": "object",
+		"properties": [
+			{
+				"name": "timestamp",
+				"type": "string",
+				"format": "time"
+			},
+			{
+				"name": "value",
+				"type": "string"
+			}
+		]
 	}]
 }

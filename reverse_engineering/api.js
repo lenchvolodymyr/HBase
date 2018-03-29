@@ -1,423 +1,475 @@
 'use strict';
 
-const config = require("./config");
-const documentClient = require("documentdb").DocumentClient;
-const client = new documentClient(config.endpoint, { "masterKey": config.accountKey });
 const async = require('async');
 const _ = require('lodash');
+const hbase = require('hbase');
+//const krb5 = require ('krb5');
+const fetch = require('node-fetch');
+const versions = require('../package.json').contributes.target.versions;
+const colFamConfig = require('./columnFamilyConfig');
+
+var client = null;
+var state = {
+	connectionInfo: {}
+};
+var clientKrb = null;
+
+
 
 module.exports = {
-	connect: function(connectionInfo, cb){
-		cb()
-	},
+	connect: function(connectionInfo, logger, cb){
+		if(!client){
+			logger.log('info', connectionInfo);
+			let options = {
+				host: connectionInfo.host,
+				port: connectionInfo.port
+			};
 
-	disconnect: function(connectionInfo, cb){
-		cb()
-	},
+			if(connectionInfo.principal){
+				options = setAuthData(options, connectionInfo);
 
-	testConnection: function(connectionInfo, cb){
-		cb(true);
-	},
-
-	getDatabases: function(connectionInfo, cb){
-		listDatabases((err, dbs) => {
-			if(err){
-				console.log(err);
-			} else {
-				dbs = dbs.map(item => item.id);
-				cb(err, dbs);
+				// krb5(options.krb5, (err, krb) => {
+				// 	if (err) {
+				// 		return cb(err);
+				// 	}
+				// 	clientKrb = krb;
+				// 	client = hbase(options);
+				// 	return cb();
+				// });
 			}
+
+			client = hbase(options);
+			return cb();
+		}
+		return cb();
+	},
+
+	disconnect: function(cb){
+		client = null;
+		state.connectionInfo = {};
+		cb();
+	},
+
+	testConnection: function(connectionInfo, logger, cb){
+		this.connect(connectionInfo, logger, err => {
+			if(err){
+				logger.log('error', err);
+				return cb(err);
+			}
+
+			getClusterVersion(connectionInfo).then(version => {
+				return cb();
+			})
+			.catch(err => {
+				logger.log('error', err);
+				return cb(err);
+			});
 		});
 	},
 
-	getDocumentKinds: function(connectionInfo, cb) {
-		readDatabaseById(connectionInfo.database, (err, database) => {
+	getDbCollectionsNames: function(connectionInfo, logger, cb) {
+		this.connect(connectionInfo, logger, err => {
 			if(err){
-				console.log(err);
-			} else {
-				listCollections(database._self, (err, collections) => {
-					if(err){
-						console.log(err);
-						dbItemCallback(err)
-					} else {
+				return cb(err);
+			}
+			state.connectionInfo = connectionInfo;
 
-						async.map(collections, (collectionItem, collItemCallback) => {
-							readCollectionById(database.id, collectionItem.id, (err, collection) => {
-								if(err){
-									console.log(err);
-								} else {
-									let size = getSampleDocSize(1000, connectionInfo.recordSamplingSettings) || 1000;
-
-									listDocuments(collection._self, size, (err, documents) => {
-										if(err){
-											console.log(err);
-										} else {
-											documents  = filterDocuments(documents);
-
-											let inferSchema = generateCustomInferSchema(collectionItem.id, documents, { sampleSize: 20 });
-											let documentsPackage = getDocumentKindDataFromInfer({ bucketName: collectionItem.id, inference: inferSchema, isCustomInfer: true }, 90);
-
-											collItemCallback(err, documentsPackage);
-										}
-									});
-								}
-							});
-						}, (err, items) => {
-							if(err){
-								console.log(err);
-							}
-							return cb(err, items);
+			getNamespacesList(connectionInfo).then(namespaces => {
+				async.map(namespaces, (namespace, callback) => {
+					getTablesList(connectionInfo, namespace)
+						.then(res => {
+							return callback(null, res);
+						})
+						.catch(err => {
+							return callback(err);
 						});
-					}
-				});
-			}
-		});
-	},
-
-	getDbCollectionsNames: function(connectionInfo, cb) {
-		readDatabaseById(connectionInfo.database, (err, database) => {
-			if(err){
-				console.log(err);
-			} else {
-				listCollections(database._self, (err, collections) => {
-					if(err){
-						console.log(err);
-						cb(err)
-					} else {
-						let collectionNames = collections.map(item => item.id);
-						handleBucket(connectionInfo, collectionNames, database, cb);
-					}
-				});
-			}
-		});
-	},
-
-	getDbCollectionsData: function(data, cb){
-		let includeEmptyCollection = data.includeEmptyCollection;
-		let { recordSamplingSettings, fieldInference } = data;
-		let size = getSampleDocSize(1000, recordSamplingSettings) || 1000;
-		let bucketList = data.collectionData.dataBaseNames;
-
-		readDatabaseById(data.database, (err, database) => {
-			if(err){
-				console.log(err);
-			} else {
-				async.map(bucketList, (bucketName, collItemCallback) => {
-					readCollectionById(database.id, bucketName, (err, collection) => {
-						if(err){
-							console.log(err);
-						} else {
-							getOfferType(collection, (err, info) => {
-								if(err){
-
-								} else {
-									let bucketInfo = {
-										throughput: info.content.offerThroughput,
-										rump: info.content.offerIsRUPerMinuteThroughputEnabled ? 'OFF' : 'On'
- 									};
-
- 									let indexes = getIndexes(collection.indexingPolicy);
-
-									listDocuments(collection._self, size, (err, documents) => {
-										if(err){
-											console.log(err);
-										} else {
-											documents = filterDocuments(documents);
-											let documentKindName = data.documentKinds[collection.id].documentKindName || '*';
-											let docKindsList = data.collectionData.collections[bucketName];
-											let collectionPackages = [];
-
-											if(documentKindName !== '*'){
-												docKindsList.forEach(docKindItem => {
-													let newArrayDocuments = documents.filter((item) => {
-														return item[documentKindName] === docKindItem;
-													});
-
-													let documentsPackage = {
-														dbName: bucketName,
-														collectionName: docKindItem,
-														documents: newArrayDocuments || [],
-														indexes: [],
-														bucketIndexes: indexes,
-														views: [],
-														validation: false,
-														docType: documentKindName,
-														bucketInfo
-													};
-
-													if(fieldInference.active === 'field'){
-														documentsPackage.documentTemplate = documents[0] || null;
-													}
-
-													collectionPackages.push(documentsPackage)
-												});
-											}
-
-											collItemCallback(err, collectionPackages);
-										}
-									});
-								}
-							})
-						}
-					});
 				}, (err, items) => {
-					if(err){
-						console.log(err);
-					}
+					items = prepareDataItems(namespaces, items);
 					return cb(err, items);
 				});
+			})
+			.catch(err => {
+				logger.log('error', err);
+				return cb(err);
+			});
+		});
+	},
+
+	getDbCollectionsData: function(data, logger, cb){
+		let { recordSamplingSettings, fieldInference, includeEmptyCollection } = data;
+		let namespaces = data.collectionData.dataBaseNames;
+		let info = { 
+			host: state.connectionInfo.host,
+			port: state.connectionInfo.port
+		};
+
+		async.map(namespaces, (namespace, callback) => {
+			let tables = data.collectionData.collections[namespace];
+
+			if(!tables){
+				let documentsPackage = {
+					dbName: namespace,
+					emptyBucket: true
+				};
+				return callback(null, documentsPackage);
+			} else {
+				async.map(tables, (table, tableCallback) => {
+					let currentSchema;
+					let documentsPackage = {
+						dbName: namespace
+					};
+
+					getClusterVersion(state.connectionInfo)
+						.then(version => {
+							info.version = handleVersion(version, versions) || '';
+							return getTableSchema(namespace, table, state.connectionInfo)
+						})
+						.then(schema => {
+							currentSchema = schema;
+							return scanDocuments(namespace, table, recordSamplingSettings);
+						})
+						.then(rows => {
+							documentsPackage.collectionName = table;
+
+							if(rows.length){
+								let handledRows = handleRows(rows);
+								let customSchema = setColumnProps(handledRows.schema, currentSchema);
+
+								if(fieldInference.active === 'field'){
+									documentsPackage.documentTemplate = handledRows.documents[0];
+								}
+
+								documentsPackage.documents = handledRows.documents;
+								documentsPackage.validation = {
+									jsonSchema: customSchema
+								}
+							} else if(includeEmptyCollection){
+								documentsPackage.documents = [];
+							} else {
+								documentsPackage = null;
+							}
+
+							return tableCallback(null, documentsPackage);
+						})
+						.catch(err => {
+							logger.log('error', err);
+							return tableCallback(err);
+						});
+				}, (err, items) => {
+					if(err){
+						logger.log('error', err);
+					} else {
+						items = items.filter(item => item);
+					}
+					return callback(err, items);
+				});
 			}
+		}, (err, res) => {
+			if(err){
+				logger.log('error', err);
+			}
+			return cb(err, res, info);
 		});
 	}
 };
 
-
-function readCollectionById(dbLink, collectionId, callback) {
-	var collLink = `dbs/${dbLink}/colls/${collectionId}`;
-
-	client.readCollection(collLink, function (err, coll) {
-		if (err) {
-			console.log(err);
-			callback(err);
-		} else {
-			callback(null, coll);
-		}
-	});
+function getHostURI(connectionInfo){
+	let query = `http://${connectionInfo.host}:${connectionInfo.port}`;
+	return query;
 }
 
-function getOfferType(collection, callback) {
-	var querySpec = {
-		query: 'SELECT * FROM root r WHERE  r.resource = @link',
-		parameters: [
-			{
-				name: '@link',
-				value: collection._self
-			}
-		]
+
+function getRequestOptions(connectionInfo){
+	let headers = {
+		'Cache-Control': 'no-cache',
+		'Accept': 'application/json'
 	};
 
-	client.queryOffers(querySpec).toArray(function (err, offers) {
-		if (err) {
-			callback(err);
+	if(connectionInfo.principal){
+		let credentials = `${connectionInfo.userName}:${connectionInfo.password}`;
+		let encodedCredentials = new Buffer(credentials).toString('base64');
 
-		} else if (offers.length === 0) {
-			callback('No offer found for collection');
-
-		} else {
-			var offer = offers[0];
-			callback(null, offer);
-		}
-	});
-}
-
-function listDatabases(callback) {
-	var queryIterator = client.readDatabases().toArray(function (err, dbs) {
-		if (err) {
-			callback(err);
-		}
-
-		callback(null, dbs);
-	});
-}
-
-function listCollections(databaseLink, callback) {
-	var queryIterator = client.readCollections(databaseLink).toArray(function (err, cols) {
-		if (err) {
-			callback(err);
-		} else {            
-			callback(null, cols);
-		}
-	});
-}
-
-function readDatabaseById(databaseId, callback) {
-	client.readDatabase('dbs/' + databaseId, function (err, db) {
-		if (err) {
-			callback(err);
-		} else {
-			callback(null, db);
-		}
-	});
-}
-
-function listDocuments(collLink, maxItemCount, callback) {
-	var queryIterator = client.readDocuments(collLink, { maxItemCount }).toArray(function (err, docs) {
-		if (err) {
-			callback(err);
-		} else {
-			callback(null, docs);
-		}
-	});
-}
-
-function filterDocuments(documents){
-	return documents.map(item =>{
-		for(let prop in item){
-			if(prop && prop[0] === '_'){
-				delete item[prop];
+		clientKrb.token((err, token) => {
+			if (err) {
+				return { err };
 			}
-		}
-		return item;
-	});
-}
-
-function generateCustomInferSchema(bucketName, documents, params){
-	function typeOf(obj) {
-		return {}.toString.call(obj).split(' ')[1].slice(0, -1).toLowerCase();
-	};
-
-	let sampleSize = params.sampleSize || 30;
-
-	let inferSchema = {
-		"#docs": 0,
-		"$schema": "http://json-schema.org/schema#",
-		"properties": {}
-	};
-
-	documents.forEach(item => {
-		inferSchema["#docs"]++;
-		
-		for(let prop in item){
-			if(inferSchema.properties.hasOwnProperty(prop)){
-				inferSchema.properties[prop]["#docs"]++;
-				inferSchema.properties[prop]["samples"].indexOf(item[prop]) === -1 && inferSchema.properties[prop]["samples"].length < sampleSize? inferSchema.properties[prop]["samples"].push(item[prop]) : '';
-				inferSchema.properties[prop]["type"] = typeOf(item[prop]);
-			} else {
-				inferSchema.properties[prop] = {
-					"#docs": 1,
-					"%docs": 100,
-					"samples": [item[prop]],
-					"type": typeOf(item[prop])
-				}
-			}
-		}
-	});
-
-	for (let prop in inferSchema.properties){
-		inferSchema.properties[prop]["%docs"] = Math.round((inferSchema.properties[prop]["#docs"] / inferSchema["#docs"] * 100), 2);
-	}
-	return inferSchema;
-}
-
-function getDocumentKindDataFromInfer(data, probability){
-	let suggestedDocKinds = [];
-	let otherDocKinds = [];
-	let documentKind = {
-		key: '',
-		probability: 0	
-	};
-
-	if(data.isCustomInfer){
-		let minCount = Infinity;
-		let inference = data.inference.properties;
-
-		for(let key in inference){
-			if(config.excludeDocKind.indexOf(key) === -1){
-				if(inference[key]["%docs"] >= probability && inference[key].samples.length && typeof inference[key].samples[0] !== 'object'){
-					suggestedDocKinds.push(key);
-
-					if(inference[key]["%docs"] >= documentKind.probability && inference[key].samples.length < minCount){
-						minCount = inference[key].samples.length;
-						documentKind.probability = inference[key]["%docs"];
-						documentKind.key = key;
-					}
-				} else {
-					otherDocKinds.push(key);
-				}
-			}
-		}
-	} else {
-		let flavor = (data.flavorValue) ? data.flavorValue.split(',') : data.inference[0].Flavor.split(',');
-		if(flavor.length === 1){
-			suggestedDocKinds = Object.keys(data.inference[0].properties);
-			let matсhedDocKind = flavor[0].match(/([\s\S]*?) \= "?([\s\S]*?)"?$/);
-			documentKind.key = (matсhedDocKind.length) ? matсhedDocKind[1] : '';
-		}
+		})
+		headers.Authorization = `Negotiate ${token}`;
 	}
 
-	let documentKindData = {
-		bucketName: data.bucketName,
-		documentList: suggestedDocKinds,
-		documentKind: documentKind.key,
-		preSelectedDocumentKind: data.preSelectedDocumentKind,
-		otherDocKinds
+	return {
+		'method': 'GET',
+		'headers': headers
 	};
-
-	return documentKindData;
 }
 
-function handleBucket(connectionInfo, collectionNames, database, dbItemCallback){
-	let size = getSampleDocSize(1000, connectionInfo.recordSamplingSettings) || 1000;
+function fetchRequest(query, connectionInfo){
+	let options = getRequestOptions(connectionInfo);
+	let response;
 
-	async.map(collectionNames, (collectionName, collItemCallback) => {
-		readCollectionById(database.id, collectionName, (err, collection) => {
-			if(err){
-				console.log(err);
-			} else {
-				listDocuments(collection._self, size, (err, documents) => {
-					if(err){
-						console.log(err);
-					} else {
-						documents  = filterDocuments(documents);
-						let documentKind = connectionInfo.documentKinds[collection.id].documentKindName || '*';
-						let documentTypes = [];
-
-						if(documentKind !== '*'){
-							documentTypes = documents.map(function(doc){
-								return doc[documentKind];
-							});
-							documentTypes = documentTypes.filter((item) => Boolean(item));
-							documentTypes = _.uniq(documentTypes);
-						}
-
-						let dataItem = prepareConnectionDataItem(documentTypes, collection.id, database);
-						collItemCallback(err, dataItem);
-					}
-				});
-			}
+	if(options.error){
+		return new Promise((reject, resolve) => {
+			reject(options.error);
 		});
-	}, (err, items) => {
-		if(err){
-			console.log(err);
-		}
-		return dbItemCallback(err, items);
+	}
+
+	return fetch(query, options)
+		.then(res => {
+			response = res;
+			return res.text();
+		})
+		.then(body => {
+			body = JSON.parse(body);
+
+			if(!response.ok){
+				throw {
+					message: response.statusText, code: response.status, description: body
+				};
+			}
+			return body;
+		});
+}
+
+function getNamespacesList(connectionInfo){
+	let query = `${getHostURI(connectionInfo)}/namespaces`;
+
+	return fetchRequest(query, connectionInfo).then(res => {
+		return res.Namespace.filter(item => item !== 'hbase');
 	});
 }
 
-function prepareConnectionDataItem(documentTypes, bucketName, database){
-	let uniqueDocuments = _.uniq(documentTypes);
-	let connectionDataItem = {
-		dbName: bucketName,
-		dbCollections: uniqueDocuments
+function getTablesList(connectionInfo, namespace){
+	let query = `${getHostURI(connectionInfo)}/namespaces/${namespace}/tables`;
+
+	return fetchRequest(query, connectionInfo).then(res => {
+		return res;
+	});
+}
+
+function prepareDataItems(namespaces, items){
+	return items.map((item, index) => {
+		return {
+			dbName: namespaces[index],
+			dbCollections: item.table.map(table => {
+				return table.name;
+			})
+		};
+	}); 
+}
+
+function getTableSchema(namespace, table, connectionInfo){
+	let query = `${getHostURI(connectionInfo)}/${namespace}:${table}/schema`;
+
+	return fetchRequest(query, connectionInfo).then(res => {
+		return res;
+	});
+}
+
+function getClusterVersion(connectionInfo){
+	let query = `${getHostURI(connectionInfo)}/version/cluster`;
+
+	return fetchRequest(query, connectionInfo).then(res => {
+		return res;
+	});
+}
+
+function scanDocuments(namespace, table, recordSamplingSettings){
+	let options = {};
+	
+	if(recordSamplingSettings.active === 'absolute'){
+		let size = recordSamplingSettings.absolute.value;
+		options.filter = {
+			type: 'PageFilter',
+			value: size 
+		};
+	}
+
+	return new Promise((resolve, reject) => {
+		client
+		.table(`${namespace}:${table}`)
+		.scan(options, (err, rows) => {
+			if(err){
+				reject(err);
+			}
+			resolve(rows);
+		});
+	});
+}
+
+function handleRows(rows){
+	let data = {
+		hashTable: {},
+		documents: [],
+		schema: {
+			properties: {
+				'Row Key': {
+					type: 'string',
+					key: true,
+					pattern: '^[a-zA-Z0-9_.-]*$'
+				}
+			}
+		}
 	};
 
-	return connectionDataItem;
+	rows.forEach(item => {
+		if(!data.hashTable.hasOwnProperty(item.key)){
+			let handledColumn = handleColumn(item, data.schema.properties);
+			data.schema.properties = handledColumn.schema;
+			data.documents.push(handledColumn.doc);
+			data.hashTable[item.key] = data.documents.length - 1;
+		}
+
+		let index = data.hashTable[item.key];
+		let handledColumn = handleColumn(item, data.schema.properties, data.documents[index]);
+		data.documents[index] = handledColumn.doc;
+		data.schema.properties = handledColumn.schema;
+	});
+
+	return data;	
+}
+
+function handleColumn(item, schema, doc = {}){
+	let columnData = item.column.split(':');
+	let columnFamily = columnData[0];
+	let columnQualifier = columnData[1];
+
+	doc['Row Key'] = '';
+
+	if(!doc[columnFamily]){
+		doc[columnFamily] = {};
+	}
+
+	if(!schema[columnFamily]){
+		schema[columnFamily] = {
+			type: 'colFam',
+			properties: {}
+		};
+	}
+
+	if(!schema[columnFamily].properties[columnQualifier]){
+		schema[columnFamily].properties[columnQualifier] = getColumnQualSchema(item);
+	}
+
+	doc[columnFamily][columnQualifier] = [{
+		'timestamp': item.timestamp + '',
+		value: getValue(item.$, schema[columnFamily].properties[columnQualifier])
+	}];
+
+	return { doc, schema };
+}
+
+function getColumnQualSchema(item){
+	return {
+		type: 'colQual',
+		items: {
+			type: 'object',
+			properties:{
+				timestamp: {
+					type: 'string',
+					pattern: '^[0-9]+$'
+				},
+				value: {
+					type: getValueType(item.$)
+				}
+			}
+		}
+	};
+}
+
+function getValueType(value){
+	try {
+		value = JSON.parse(value);
+		return _.isArray(value) ? 'array' : 'object' 
+	} catch (err) {
+		return 'byte';
+	}
+}
+
+function getValue(value, colQual){
+	let schemaValue = colQual.items.properties.value;
+
+	try {
+		value = JSON.parse(value);
+		return value;
+	} catch (err) {
+		schemaValue.type = 'byte';
+		return value;
+	}
+}
+
+
+function parseSchema(schema){
+	schema = schema.replace('=>', ':');
+
+	try {
+		schema = JSON.parse(schema);
+	} catch (err) {
+		schema = null;
+	}
+
+	return schema;
+}
+
+function setColumnProps(customSchema, schema){
+	schema.ColumnSchema.forEach(item => {
+		if (!customSchema.properties[item.name]){
+			customSchema.properties[item.name] = {
+				type: 'colFam'
+			};
+		}
+
+		if(colFamConfig && colFamConfig.length){
+			colFamConfig.forEach(prop => {
+				switch(prop.propertyType){
+					case 'number':
+						customSchema.properties[item.name][prop.propertyKeyword] = Number(item[prop.schemaKeyword]);
+						break;
+					case 'boolean':
+						customSchema.properties[item.name][prop.propertyKeyword] = getBoolean(item[prop.schemaKeyword]);
+						break;
+					default:
+						customSchema.properties[item.name][prop.propertyKeyword] = item[prop.schemaKeyword];
+				}
+			});
+		}
+	});
+
+	return customSchema;
+}
+
+function getBoolean(value){
+	return value === 'TRUE';
 }
 
 function getSampleDocSize(count, recordSamplingSettings) {
 	let per = recordSamplingSettings.relative.value;
-	return (recordSamplingSettings.active === 'absolute')
+	let res = (recordSamplingSettings.active === 'absolute')
 		? recordSamplingSettings.absolute.value
-			: Math.round( count/100 * per);
+		: Math.ceil( count/100 * per);
+	return count < res ? count : res;
 }
 
-function getIndexes(indexingPolicy){
-	let generalIndexes = [];
-	
-	if(indexingPolicy){
-		indexingPolicy.includedPaths.forEach(item => {
-			let indexes = item.indexes;
-			indexes = indexes.map(index => {
-				index.indexPrecision = index.precision;
-				index.automatic = item.automatic;
-				index.mode = indexingPolicy.indexingMode;
-				index.indexIncludedPath = item.path;
-				return index;
-			});
+function handleVersion(version, versions){
+	return versions.find(item => {
+		let sItem = item.split('');
 
-			generalIndexes = generalIndexes.concat(generalIndexes, indexes);
+		sItem = sItem.map((item, index) => {
+			return item === 'x' ? version[index] : item;
 		});
-	}
+		return version	=== sItem.join('')	
+	})
+}
 
-	return generalIndexes;
+function setAuthData(options, connectionInfo){
+	let authParams = {
+		krb5:{
+			principal: connectionInfo.principal,
+			service_principal: connectionInfo.service_principal,
+			[connectionInfo.auth]: connectionInfo[connectionInfo.auth]
+		}
+	};
+
+	options = Object.assign(options, authParams);
+
+	return options;
 }
