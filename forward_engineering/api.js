@@ -27,7 +27,7 @@ module.exports = {
 		}
 
 		if(!columnFamilies.length){
-			columnFamilies.push('<columnFaimily>');
+			columnFamilies.push('<columnFamily>');
 		}
 
 		return columnFamilies;
