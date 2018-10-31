@@ -2,7 +2,7 @@
 	"model": {
 		"modelName": "New model",
 		"dbVersion": "",
-		"dbVendor": "Apache HBase",
+		"dbVendor": "HBase",
 		"port": 9200
 	},
 	"container": {
@@ -18,7 +18,7 @@
 		"name": "New column"
 	},
 	"patternField": {
-		"name": "^[a-zA-Z0-9_.-]*$"
+		"name": "^[a-zA-Z0-9_.-]+$"
 	},
 	"multipleField": {
 		"primaryKey": false

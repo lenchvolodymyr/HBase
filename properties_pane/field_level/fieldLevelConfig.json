@@ -178,10 +178,9 @@ making sure that you maintain a proper JSON format.
 				"propertyKeyword": "blockcache",
 				"propertyType": "checkbox"
 			},
-
 			"comments"
 		],
-		"colQual": "document",
+		"colQual": "array",
 		"byte": "string",
 		"string": [
 			"name",

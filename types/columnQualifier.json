@@ -2,7 +2,7 @@
 	"name": "colQual",
 	"erdAbbreviation": "<cQ>",
 	"dtdAbbreviation": "{...}",
-	"parentType": "document",
+	"parentType": "array",
 	"defaultValues": {
 		"primaryKey": false,
 		"relationshipType": "",

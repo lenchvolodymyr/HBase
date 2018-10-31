@@ -96,7 +96,7 @@ module.exports = {
 	},
 
 	getDbCollectionsData: function(data, logger, cb){
-		let { recordSamplingSettings, fieldInference } = data;
+		let { recordSamplingSettings, fieldInference, includeEmptyCollection } = data;
 		let namespaces = data.collectionData.dataBaseNames;
 		let info = { 
 			host: state.connectionInfo.host,
@@ -106,49 +106,64 @@ module.exports = {
 		async.map(namespaces, (namespace, callback) => {
 			let tables = data.collectionData.collections[namespace];
 
-			async.map(tables, (table, tableCallback) => {
-				let currentSchema;
+			if(!tables){
+				let documentsPackage = {
+					dbName: namespace,
+					emptyBucket: true
+				};
+				return callback(null, documentsPackage);
+			} else {
+				async.map(tables, (table, tableCallback) => {
+					let currentSchema;
+					let documentsPackage = {
+						dbName: namespace
+					};
 
-				getClusterVersion(state.connectionInfo)
-					.then(version => {
-						info.version = handleVersion(version, versions) || '';
-						return getTableSchema(namespace, table, state.connectionInfo)
-					})
-					.then(schema => {
-						currentSchema = schema;
-						return scanDocuments(namespace, table, recordSamplingSettings);
-					})
-					.then(rows => {
-						let documentsPackage = {
-							dbName: namespace,
-							collectionName: table,
-							emptyBucket: true
-						};
+					getClusterVersion(state.connectionInfo)
+						.then(version => {
+							info.version = handleVersion(version, versions) || '';
+							return getTableSchema(namespace, table, state.connectionInfo)
+						})
+						.then(schema => {
+							currentSchema = schema;
+							return scanDocuments(namespace, table, recordSamplingSettings);
+						})
+						.then(rows => {
+							documentsPackage.collectionName = table;
 
-						if(rows.length){
-							//let size = getSampleDocSize(rows.length, recordSamplingSettings);
-							let handledRows = handleRows(rows);
-							let customSchema = setColumnProps(handledRows.schema, currentSchema);
+							if(rows.length){
+								let handledRows = handleRows(rows);
+								let customSchema = setColumnProps(handledRows.schema, currentSchema);
 
-							documentsPackage.emptyBucket = false;
-							documentsPackage.documents = handledRows.documents;
-							documentsPackage.validation = {
-								jsonSchema: customSchema
+								if(fieldInference.active === 'field'){
+									documentsPackage.documentTemplate = handledRows.documents[0];
+								}
+
+								documentsPackage.documents = handledRows.documents;
+								documentsPackage.validation = {
+									jsonSchema: customSchema
+								}
+							} else if(includeEmptyCollection){
+								documentsPackage.documents = [];
+							} else {
+								documentsPackage = null;
 							}
-						}
 
-						return tableCallback(null, documentsPackage);
-					})
-					.catch(err => {
+							return tableCallback(null, documentsPackage);
+						})
+						.catch(err => {
+							logger.log('error', err);
+							return tableCallback(err);
+						});
+				}, (err, items) => {
+					if(err){
 						logger.log('error', err);
-						return tableCallback(err);
-					});
-			}, (err, items) => {
-				if(err){
-					logger.log('error', err);
-				}
-				return callback(err, items);
-			});
+					} else {
+						items = items.filter(item => item);
+					}
+					return callback(err, items);
+				});
+			}
 		}, (err, res) => {
 			if(err){
 				logger.log('error', err);
@@ -281,23 +296,23 @@ function scanDocuments(namespace, table, recordSamplingSettings){
 	});
 }
 
-function handleRows(rows, size){
+function handleRows(rows){
 	let data = {
 		hashTable: {},
 		documents: [],
 		schema: {
 			properties: {
-				'^[a-zA-Z0-9_.-]*$': {
+				'Row Key': {
 					type: 'string',
-					primaryKey: true,
-					isPatternField: true
+					key: true,
+					pattern: '^[a-zA-Z0-9_.-]*$'
 				}
 			}
 		}
 	};
 
-	rows.slice(-size).forEach(item => {
-		if(!data.hashTable[item.key]){
+	rows.forEach(item => {
+		if(!data.hashTable.hasOwnProperty(item.key)){
 			let handledColumn = handleColumn(item, data.schema.properties);
 			data.schema.properties = handledColumn.schema;
 			data.documents.push(handledColumn.doc);
@@ -318,6 +333,8 @@ function handleColumn(item, schema, doc = {}){
 	let columnFamily = columnData[0];
 	let columnQualifier = columnData[1];
 
+	doc['Row Key'] = '';
+
 	if(!doc[columnFamily]){
 		doc[columnFamily] = {};
 	}
@@ -330,22 +347,33 @@ function handleColumn(item, schema, doc = {}){
 	}
 
 	if(!schema[columnFamily].properties[columnQualifier]){
-		schema[columnFamily].properties[columnQualifier] = {
-			type: 'colQual',
-			properties: {
+		schema[columnFamily].properties[columnQualifier] = getColumnQualSchema(item);
+	}
+
+	doc[columnFamily][columnQualifier] = [{
+		'timestamp': item.timestamp + '',
+		value: getValue(item.$, schema[columnFamily].properties[columnQualifier])
+	}];
+
+	return { doc, schema };
+}
+
+function getColumnQualSchema(item){
+	return {
+		type: 'colQual',
+		items: {
+			type: 'object',
+			properties:{
+				timestamp: {
+					type: 'string',
+					pattern: '^[0-9]+$'
+				},
 				value: {
 					type: getValueType(item.$)
 				}
 			}
-		};
-	}
-
-	doc[columnFamily][columnQualifier] = {
-		value: getValue(item.$, schema[columnFamily].properties[columnQualifier]),
-		'timestamp': item.timestamp
+		}
 	};
-
-	return { doc, schema };
 }
 
 function getValueType(value){
@@ -358,7 +386,7 @@ function getValueType(value){
 }
 
 function getValue(value, colQual){
-	let schemaValue = colQual.properties.value;
+	let schemaValue = colQual.items.properties.value;
 
 	try {
 		value = JSON.parse(value);
