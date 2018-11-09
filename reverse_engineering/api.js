@@ -2,7 +2,6 @@
 
 const async = require('async');
 const _ = require('lodash');
-const krb5 = require ('krb5');
 const fetch = require('node-fetch');
 const versions = require('../package.json').contributes.target.versions;
 const colFamConfig = require('./columnFamilyConfig');
@@ -12,7 +11,8 @@ var state = {
 var clientKrb = null;
 
 module.exports = {
-	connect: function(connectionInfo, logger, cb){
+	connect: function(connectionInfo, logger, cb, app){
+		const krb5 = app.require('krb5');
 		logger.log('info', connectionInfo);
 
 		let options = setAuthData({
@@ -44,7 +44,7 @@ module.exports = {
 		}
 	},
 
-	testConnection: function(connectionInfo, logger, cb){
+	testConnection: function(connectionInfo, logger, cb, app){
 		this.connect(connectionInfo, logger, err => {
 			if(err){
 				logger.log('error', err);
@@ -58,10 +58,10 @@ module.exports = {
 				logger.log('error', err);
 				return cb(err);
 			});
-		});
+		}, app);
 	},
 
-	getDbCollectionsNames: function(connectionInfo, logger, cb) {
+	getDbCollectionsNames: function(connectionInfo, logger, cb, app) {
 		this.connect(connectionInfo, logger, err => {
 			if(err){
 				return cb(err);
@@ -85,7 +85,7 @@ module.exports = {
 				logger.log('error', err);
 				return cb(err);
 			});
-		});
+		}, app);
 	},
 
 	getDbCollectionsData: function(data, logger, cb){
@@ -451,15 +451,18 @@ const handleResponse = (response) => {
 
 const getScannerBody = (recordSamplingSettings) => {
 	const t = (size = 4) => ' '.repeat(size);
+	const getFilter = (filter) => {
+		return '\n' + t() + '<filter>\n' + t(2*4) + JSON.stringify(filter, null, 4).split('\n').join('\n' + t(2*4)) + '\n' + t() + '</filter>\n';
+	};
 	let body = '<Scanner batch="1000">';
 
 	if (recordSamplingSettings.active === 'absolute') {
 		let size = recordSamplingSettings.absolute.value;
 
-		body += '\n' + t() + '<filter>\n' + t(2*4) + JSON.stringify({
+		body += getFilter({
 			type: 'PageFilter',
 			value: size 
-		}, null, 4).split('\n').join('\n' + t(2*4)) + '\n' + t() + '</filter>\n';
+		});
 	}
 
 	body += '</Scanner>';
