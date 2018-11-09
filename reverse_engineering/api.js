@@ -111,17 +111,27 @@ module.exports = {
 					let documentsPackage = {
 						dbName: namespace
 					};
-
+					logger.progress({ message: 'Start getting version of cluster', containerName: namespace, entityName: table });
 					getClusterVersion(state.connectionInfo)
 						.then(version => {
+							logger.progress({ message: 'Version of cluster: ' + version, containerName: namespace, entityName: table });
+
 							info.version = handleVersion(version, versions) || '';
+
+							logger.progress({ message: 'Start getting schema of table', containerName: namespace, entityName: table });
+
 							return getTableSchema(namespace, table, state.connectionInfo)
 						})
 						.then(schema => {
+							logger.progress({ message: 'Schema has successfully got!', containerName: namespace, entityName: table });
+							logger.progress({ message: 'Start getting documents', containerName: namespace, entityName: table });
+
 							currentSchema = schema;
 							return scanDocuments(namespace, table, recordSamplingSettings, state.connectionInfo);
 						})
 						.then(rows => {
+							logger.progress({ message: 'Documents have successfully got!', containerName: namespace, entityName: table });
+
 							documentsPackage.collectionName = table;
 
 							if(rows.length){
