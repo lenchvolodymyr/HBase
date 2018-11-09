@@ -146,6 +146,12 @@ module.exports = {
 								documentsPackage.validation = {
 									jsonSchema: customSchema
 								}
+							} else if (currentSchema) {
+								let customSchema = setColumnProps({ properties: {} }, currentSchema);
+								documentsPackage.documents = [];
+								documentsPackage.validation = {
+									jsonSchema: customSchema
+								};
 							} else if(includeEmptyCollection){
 								documentsPackage.documents = [];
 							} else {
