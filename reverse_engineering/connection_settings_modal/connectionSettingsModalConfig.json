@@ -82,7 +82,7 @@
 				"inputLabel": "Keytab file",
 				"inputKeyword": "keytab",
 				"inputType": "file",
-				"extensions": ["pem", "crt", "key"],
+				"extensions": ["keytab"],
 				"dependency": {
 					"key": "auth",
 					"value": "kerberos"
