@@ -120,7 +120,9 @@ module.exports = {
 
 							logger.progress({ message: 'Start getting schema of table', containerName: namespace, entityName: table });
 
-							return getTableSchema(namespace, table, state.connectionInfo)
+							return getTableSchema(namespace, table, state.connectionInfo).catch(err => {
+								return Promise.resolve({});
+							});
 						})
 						.then(schema => {
 							logger.progress({ message: 'Schema has successfully got!', containerName: namespace, entityName: table });
@@ -184,19 +186,27 @@ module.exports = {
 
 function getHostURI(connectionInfo){
 	const protocol = connectionInfo.https ? 'https' : 'http';
-	let query = `${protocol}://${connectionInfo.host}:${connectionInfo.port}`;
+	let query = `${protocol}://${connectionInfo.host}:${connectionInfo.port}${connectionInfo.resource || ''}`;
 	return query;
 }
 
 
-function getRequestOptions() {
+function getRequestOptions(connectionInfo) {
 	return new Promise((resolve, reject) => {
 		let headers = {
 			'Cache-Control': 'no-cache',
 			'Accept': 'application/json'
 		};
-	
-		if (clientKrb) {
+
+		if (connectionInfo.auth === 'basic') {
+			const credentials = Buffer.from(connectionInfo.basic_username + ':' + connectionInfo.basic_password).toString('base64');
+			headers.Authorization = 'Basic ' + credentials;
+
+			resolve({
+				method: 'GET',
+				headers
+			});
+		} else if (clientKrb) {
 			clientKrb.token((err, token) => {
 				if (err) {
 					return reject(err);
@@ -490,7 +500,7 @@ const scanDocuments = (namespace, table, recordSamplingSettings, connectionInfo)
 	const tableName = `${namespace}:${table}`;
 	let query = `${getHostURI(connectionInfo)}/${tableName}/scanner`;
 
-	return getRequestOptions()
+	return getRequestOptions(connectionInfo)
 		.then(options => {
 			options.method = 'PUT';
 			options.body = getScannerBody(recordSamplingSettings);
@@ -503,11 +513,11 @@ const scanDocuments = (namespace, table, recordSamplingSettings, connectionInfo)
 		.then(({ response, result }) => {
 			return response.headers.get('location') || '';
 		})
-		.then(getCells);
+		.then(getCells(connectionInfo));
 };
 
-const getCells = (query, cells = []) => new Promise((resolve, reject) => {
-	return getRequestOptions()
+const getCells = connectionInfo => (query, cells = []) => new Promise((resolve, reject) => {
+	return getRequestOptions(connectionInfo)
 		.then(options => {
 			return fetch(query, options);
 		})

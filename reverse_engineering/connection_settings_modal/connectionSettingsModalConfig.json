@@ -20,6 +20,12 @@
 				"inputType": "numeric"
 			},
 			{
+				"inputLabel": "Resource",
+				"inputKeyword": "resource",
+				"inputPlaceholder": "/",
+				"inputType": "text"
+			},
+			{
 				"inputLabel": "HTTPS",
 				"inputKeyword": "https",
 				"inputType": "checkbox"
@@ -39,6 +45,9 @@
 				}, {
 					"value": "kerberos",
 					"label": "Kerberos"
+				}, {
+					"value": "basic",
+					"label": "Basic"
 				}],
 				"defaultValue": "none"
 			},
@@ -96,6 +105,24 @@
 				"dependency": {
 					"key": "auth",
 					"value": "kerberos"
+				}
+			},
+			{
+				"inputLabel": "User name",
+				"inputKeyword": "basic_username",
+				"inputType": "text",
+				"dependency": {
+					"key": "auth",
+					"value": "basic"
+				}
+			},
+			{
+				"inputLabel": "Password",
+				"inputKeyword": "basic_password",
+				"inputType": "password",
+				"dependency": {
+					"key": "auth",
+					"value": "basic"
 				}
 			}
 		]
