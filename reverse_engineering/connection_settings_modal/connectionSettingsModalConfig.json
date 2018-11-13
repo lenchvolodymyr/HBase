@@ -43,25 +43,8 @@
 				"defaultValue": "none"
 			},
 			{
-				"inputLabel": "Authentication type",
-				"inputKeyword": "krbAuthType",
-				"inputType": "select",
-				"options": [{
-					"value": "password",
-					"label": "password"
-				}, {
-					"value": "keytab",
-					"label": "keytab file"
-				}],
-				"defaultValue": "password",
-				"dependency": {
-					"key": "auth",
-					"value": "kerberos"
-				}
-			},
-			{
 				"inputLabel": "Principal",
-				"inputKeyword": "principal",
+				"inputKeyword": "username",
 				"inputType": "text",
 				"inputPlaceholder": "{username}@{REALM}",
 				"dependency": {
@@ -73,16 +56,6 @@
 				"inputLabel": "Password",
 				"inputKeyword": "password",
 				"inputType": "password",
-				"dependency": {
-					"key": "auth",
-					"value": "kerberos"
-				}
-			},
-			{
-				"inputLabel": "Keytab file",
-				"inputKeyword": "keytab",
-				"inputType": "file",
-				"extensions": ["keytab"],
 				"dependency": {
 					"key": "auth",
 					"value": "kerberos"
