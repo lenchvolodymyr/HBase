@@ -435,8 +435,8 @@ function setAuthData(options, connectionInfo){
 
 	if (connectionInfo.auth === 'kerberos') {
 		authParams.krb5 = {
-			user: connectionInfo.username,
-			service: connectionInfo.service_principal,
+			principal: connectionInfo.principal,
+			service_principal: connectionInfo.service_principal,
 			password: connectionInfo.password
 		};
 	}

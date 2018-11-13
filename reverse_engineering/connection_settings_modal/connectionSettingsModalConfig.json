@@ -44,7 +44,7 @@
 			},
 			{
 				"inputLabel": "Principal",
-				"inputKeyword": "username",
+				"inputKeyword": "principal",
 				"inputType": "text",
 				"inputPlaceholder": "{username}@{REALM}",
 				"dependency": {

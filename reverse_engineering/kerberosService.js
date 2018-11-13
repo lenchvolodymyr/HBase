@@ -9,7 +9,7 @@ const getTokenFromKerberos = (kerberos, service, user, password) => {
 	});
 };
 
-const getClient = kerberos => ({ user, password, service }) => Promise.resolve({
+const getClient = kerberos => ({ principal: user, service_principal: service, password }) => Promise.resolve({
 	token: (callback) => {
 		getTokenFromKerberos(kerberos, service, user, password).then(
 			(token) => callback(null, token),
