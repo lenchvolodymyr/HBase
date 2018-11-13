@@ -2,55 +2,47 @@
 
 const async = require('async');
 const _ = require('lodash');
-const hbase = require('hbase');
-//const krb5 = require ('krb5');
 const fetch = require('node-fetch');
 const versions = require('../package.json').contributes.target.versions;
 const colFamConfig = require('./columnFamilyConfig');
-
-var client = null;
+const kerberosService = require('./kerberosService');
 var state = {
 	connectionInfo: {}
 };
 var clientKrb = null;
 
-
-
 module.exports = {
-	connect: function(connectionInfo, logger, cb){
-		if(!client){
-			logger.log('info', connectionInfo);
-			let options = {
-				host: connectionInfo.host,
-				port: connectionInfo.port
-			};
+	connect: function(connectionInfo, logger, cb, app){
+		const kerberos = app.require('kerberos');
+		logger.log('info', connectionInfo);
 
-			if(connectionInfo.principal){
-				options = setAuthData(options, connectionInfo);
-
-				// krb5(options.krb5, (err, krb) => {
-				// 	if (err) {
-				// 		return cb(err);
-				// 	}
-				// 	clientKrb = krb;
-				// 	client = hbase(options);
-				// 	return cb();
-				// });
-			}
-
-			client = hbase(options);
+		let options = setAuthData({
+			host: connectionInfo.host,
+			port: connectionInfo.port
+		}, connectionInfo);
+		
+		if(!clientKrb && options.krb5){
+			kerberosService({ kerberos }).getClient(options.krb5)
+				.then(client => {
+					clientKrb = client;
+					return cb();			
+				}, err => cb(err));
+		} else {
 			return cb();
 		}
-		return cb();
 	},
 
 	disconnect: function(cb){
 		client = null;
 		state.connectionInfo = {};
-		cb();
+		if (clientKrb) {
+			clientKrb.destroy(cb);
+		} else {
+			cb();
+		}
 	},
 
-	testConnection: function(connectionInfo, logger, cb){
+	testConnection: function(connectionInfo, logger, cb, app){
 		this.connect(connectionInfo, logger, err => {
 			if(err){
 				logger.log('error', err);
@@ -64,10 +56,10 @@ module.exports = {
 				logger.log('error', err);
 				return cb(err);
 			});
-		});
+		}, app);
 	},
 
-	getDbCollectionsNames: function(connectionInfo, logger, cb) {
+	getDbCollectionsNames: function(connectionInfo, logger, cb, app) {
 		this.connect(connectionInfo, logger, err => {
 			if(err){
 				return cb(err);
@@ -75,12 +67,11 @@ module.exports = {
 			state.connectionInfo = connectionInfo;
 
 			getNamespacesList(connectionInfo).then(namespaces => {
-				async.map(namespaces, (namespace, callback) => {
+				async.mapSeries(namespaces, (namespace, callback) => {
 					getTablesList(connectionInfo, namespace)
 						.then(res => {
 							return callback(null, res);
-						})
-						.catch(err => {
+						}, (err) => {
 							return callback(err);
 						});
 				}, (err, items) => {
@@ -92,7 +83,7 @@ module.exports = {
 				logger.log('error', err);
 				return cb(err);
 			});
-		});
+		}, app);
 	},
 
 	getDbCollectionsData: function(data, logger, cb){
@@ -113,22 +104,32 @@ module.exports = {
 				};
 				return callback(null, documentsPackage);
 			} else {
-				async.map(tables, (table, tableCallback) => {
+				async.mapSeries(tables, (table, tableCallback) => {
 					let currentSchema;
 					let documentsPackage = {
 						dbName: namespace
 					};
-
+					logger.progress({ message: 'Start getting version of cluster', containerName: namespace, entityName: table });
 					getClusterVersion(state.connectionInfo)
 						.then(version => {
+							logger.progress({ message: 'Version of cluster: ' + version, containerName: namespace, entityName: table });
+
 							info.version = handleVersion(version, versions) || '';
+
+							logger.progress({ message: 'Start getting schema of table', containerName: namespace, entityName: table });
+
 							return getTableSchema(namespace, table, state.connectionInfo)
 						})
 						.then(schema => {
+							logger.progress({ message: 'Schema has successfully got!', containerName: namespace, entityName: table });
+							logger.progress({ message: 'Start getting documents', containerName: namespace, entityName: table });
+
 							currentSchema = schema;
-							return scanDocuments(namespace, table, recordSamplingSettings);
+							return scanDocuments(namespace, table, recordSamplingSettings, state.connectionInfo);
 						})
 						.then(rows => {
+							logger.progress({ message: 'Documents have successfully got!', containerName: namespace, entityName: table });
+
 							documentsPackage.collectionName = table;
 
 							if(rows.length){
@@ -143,6 +144,12 @@ module.exports = {
 								documentsPackage.validation = {
 									jsonSchema: customSchema
 								}
+							} else if (currentSchema) {
+								let customSchema = setColumnProps({ properties: {} }, currentSchema);
+								documentsPackage.documents = [];
+								documentsPackage.validation = {
+									jsonSchema: customSchema
+								};
 							} else if(includeEmptyCollection){
 								documentsPackage.documents = [];
 							} else {
@@ -174,59 +181,49 @@ module.exports = {
 };
 
 function getHostURI(connectionInfo){
-	let query = `http://${connectionInfo.host}:${connectionInfo.port}`;
+	const protocol = connectionInfo.https ? 'https' : 'http';
+	let query = `${protocol}://${connectionInfo.host}:${connectionInfo.port}`;
 	return query;
 }
 
 
-function getRequestOptions(connectionInfo){
-	let headers = {
-		'Cache-Control': 'no-cache',
-		'Accept': 'application/json'
-	};
+function getRequestOptions() {
+	return new Promise((resolve, reject) => {
+		let headers = {
+			'Cache-Control': 'no-cache',
+			'Accept': 'application/json'
+		};
+	
+		if (clientKrb) {
+			clientKrb.token((err, token) => {
+				if (err) {
+					return reject(err);
+				}
 
-	if(connectionInfo.principal){
-		let credentials = `${connectionInfo.userName}:${connectionInfo.password}`;
-		let encodedCredentials = new Buffer(credentials).toString('base64');
-
-		clientKrb.token((err, token) => {
-			if (err) {
-				return { err };
-			}
-		})
-		headers.Authorization = `Negotiate ${token}`;
-	}
-
-	return {
-		'method': 'GET',
-		'headers': headers
-	};
+				headers.Authorization = `Negotiate ${token}`;
+	
+				resolve({
+					method: 'GET',
+					headers
+				});
+			});
+		} else {
+			resolve({
+				'method': 'GET',
+				'headers': headers
+			});
+		}
+	});
 }
 
 function fetchRequest(query, connectionInfo){
-	let options = getRequestOptions(connectionInfo);
-	let response;
-
-	if(options.error){
-		return new Promise((reject, resolve) => {
-			reject(options.error);
-		});
-	}
-
-	return fetch(query, options)
-		.then(res => {
-			response = res;
-			return res.text();
+	return getRequestOptions(connectionInfo)
+		.then((options) => {
+			return fetch(query, options)
 		})
-		.then(body => {
-			body = JSON.parse(body);
-
-			if(!response.ok){
-				throw {
-					message: response.statusText, code: response.status, description: body
-				};
-			}
-			return body;
+		.then(handleResponse)
+		.then(({ result, response}) => {
+			return JSON.parse(result);
 		});
 }
 
@@ -270,29 +267,6 @@ function getClusterVersion(connectionInfo){
 
 	return fetchRequest(query, connectionInfo).then(res => {
 		return res;
-	});
-}
-
-function scanDocuments(namespace, table, recordSamplingSettings){
-	let options = {};
-	
-	if(recordSamplingSettings.active === 'absolute'){
-		let size = recordSamplingSettings.absolute.value;
-		options.filter = {
-			type: 'PageFilter',
-			value: size 
-		};
-	}
-
-	return new Promise((resolve, reject) => {
-		client
-		.table(`${namespace}:${table}`)
-		.scan(options, (err, rows) => {
-			if(err){
-				reject(err);
-			}
-			resolve(rows);
-		});
 	});
 }
 
@@ -379,7 +353,24 @@ function getColumnQualSchema(item){
 function getValueType(value){
 	try {
 		value = JSON.parse(value);
-		return _.isArray(value) ? 'array' : 'object' 
+
+		switch(typeof value) {
+			case 'object':
+				if (value) {
+					return _.isArray(value) ? 'array' : 'object' 
+				} else {
+					return 'null';
+				}
+			case 'number':
+				return 'number';
+			case 'string':
+				return 'string';
+			case 'boolean':
+				return 'boolean';
+			default:
+				return 'byte';
+		}
+
 	} catch (err) {
 		return 'byte';
 	}
@@ -395,19 +386,6 @@ function getValue(value, colQual){
 		schemaValue.type = 'byte';
 		return value;
 	}
-}
-
-
-function parseSchema(schema){
-	schema = schema.replace('=>', ':');
-
-	try {
-		schema = JSON.parse(schema);
-	} catch (err) {
-		schema = null;
-	}
-
-	return schema;
 }
 
 function setColumnProps(customSchema, schema){
@@ -441,14 +419,6 @@ function getBoolean(value){
 	return value === 'TRUE';
 }
 
-function getSampleDocSize(count, recordSamplingSettings) {
-	let per = recordSamplingSettings.relative.value;
-	let res = (recordSamplingSettings.active === 'absolute')
-		? recordSamplingSettings.absolute.value
-		: Math.ceil( count/100 * per);
-	return count < res ? count : res;
-}
-
 function handleVersion(version, versions){
 	return versions.find(item => {
 		let sItem = item.split('');
@@ -461,15 +431,114 @@ function handleVersion(version, versions){
 }
 
 function setAuthData(options, connectionInfo){
-	let authParams = {
-		krb5:{
+	let authParams = {};
+
+	if (connectionInfo.auth === 'kerberos') {
+		authParams.krb5 = {
 			principal: connectionInfo.principal,
 			service_principal: connectionInfo.service_principal,
-			[connectionInfo.auth]: connectionInfo[connectionInfo.auth]
-		}
-	};
+			password: connectionInfo.password
+		};
+	}
 
 	options = Object.assign(options, authParams);
 
 	return options;
 }
+
+const handleResponse = (response) => {
+	return response.text()
+		.then(result => {
+			if (!response.ok) {
+				return Promise.reject({
+					message: response.statusText, code: response.status, description: result
+				});
+			}
+
+			return {
+				response,
+				result
+			};			
+		})
+};
+
+const getScannerBody = (recordSamplingSettings) => {
+	const t = (size = 4) => ' '.repeat(size);
+	const getFilter = (filter) => {
+		return '\n' + t() + '<filter>\n' + t(2*4) + JSON.stringify(filter, null, 4).split('\n').join('\n' + t(2*4)) + '\n' + t() + '</filter>\n';
+	};
+	let body = '<Scanner batch="1000">';
+
+	if (recordSamplingSettings.active === 'absolute') {
+		let size = recordSamplingSettings.absolute.value;
+
+		body += getFilter({
+			type: 'PageFilter',
+			value: size 
+		});
+	}
+
+	body += '</Scanner>';
+
+	return body;
+};
+
+const scanDocuments = (namespace, table, recordSamplingSettings, connectionInfo) => {
+	const tableName = `${namespace}:${table}`;
+	let query = `${getHostURI(connectionInfo)}/${tableName}/scanner`;
+
+	return getRequestOptions()
+		.then(options => {
+			options.method = 'PUT';
+			options.body = getScannerBody(recordSamplingSettings);
+			options.headers.Accept = 'text/xml';
+			options.headers['Content-Type'] = 'text/xml';
+
+			return fetch(query, options);
+		})
+		.then(handleResponse)
+		.then(({ response, result }) => {
+			return response.headers.get('location') || '';
+		})
+		.then(getCells);
+};
+
+const getCells = (query, cells = []) => new Promise((resolve, reject) => {
+	return getRequestOptions()
+		.then(options => {
+			return fetch(query, options);
+		})
+		.then(handleResponse)
+		.then(({ result, response }) => {
+			if (response.status === 204) {
+				resolve(cells);
+			} else {
+				const data = getRows(JSON.parse(result))
+
+				return getCells(query, [ ...cells, ...data ]);
+			}
+		})
+		.then(resolve, reject);
+});
+
+const decodeBase64 = (str) => Buffer.from(str, 'base64').toString();
+
+const getRows = (data) => {
+	let cells = [];
+
+	data.Row.forEach((row) => {
+		let key = decodeBase64(row.key, 'utf-8');
+
+		return row.Cell.forEach((cell) => {
+		  data = {};
+		  data.key = key;
+		  data.column = decodeBase64(cell.column, 'utf-8');
+		  data.timestamp = cell.timestamp;
+		  data.$ = decodeBase64(cell.$, 'utf-8');
+
+		  return cells.push(data);
+		});
+	});
+
+	return cells;
+};

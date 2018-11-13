@@ -4,9 +4,8 @@
   "description": "",
   "author": "Hackolade",
   "dependencies": {
-    "async": "^2.6.0",
-    "hbase": "^0.3.0",
-    "krb5": "^0.1.0",
+    "async": "2.6.0",
     "node-fetch": "2.1.1"
-  }
+  },
+  "installed": false
 }

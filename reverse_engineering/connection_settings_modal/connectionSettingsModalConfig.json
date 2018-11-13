@@ -18,57 +18,59 @@
 				"inputLabel": "Port",
 				"inputKeyword": "port",
 				"inputType": "numeric"
+			},
+			{
+				"inputLabel": "HTTPS",
+				"inputKeyword": "https",
+				"inputType": "checkbox"
 			}
 		]
-	}/*,
+	},
 	{
 		"lowerTab": "Authentication",
 		"structure": [
 			{
 				"inputLabel": "Authentication",
-				"inputKeyword": "authType",
+				"inputKeyword": "auth",
 				"inputType": "select",
 				"options": [{
-					"value": "password",
-					"label": "password"
+					"value": "none",
+					"label": "None"
 				}, {
-					"value": "keytab",
-					"label": "keytab file"
+					"value": "kerberos",
+					"label": "Kerberos"
 				}],
-				"defaultValue": "password"
+				"defaultValue": "none"
 			},
 			{
 				"inputLabel": "Principal",
 				"inputKeyword": "principal",
 				"inputType": "text",
-				"inputPlaceholder": "principal"
-				
+				"inputPlaceholder": "{username}@{REALM}",
+				"dependency": {
+					"key": "auth",
+					"value": "kerberos"
+				}
 			},
 			{
 				"inputLabel": "Password",
 				"inputKeyword": "password",
 				"inputType": "password",
 				"dependency": {
-					"key": "authType",
-					"value": "password"
-				}
-			},
-			{
-				"inputLabel": "Keytab file",
-				"inputKeyword": "keytab",
-				"inputType": "file",
-				"extensions": ["pem", "crt", "key"],
-				"dependency": {
-					"key": "authType",
-					"value": "keytab"
+					"key": "auth",
+					"value": "kerberos"
 				}
 			},
 			{
 				"inputLabel": "Service principal",
 				"inputKeyword": "service_principal",
 				"inputType": "text",
-				"inputPlaceholder": "Service principal"
+				"inputPlaceholder": "HTTP@{fqdn}",
+				"dependency": {
+					"key": "auth",
+					"value": "kerberos"
+				}
 			}
 		]
-	}*/
+	}
 ]
