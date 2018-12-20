@@ -14,7 +14,7 @@ var clientKrb = null;
 module.exports = {
 	connect: function(connectionInfo, logger, cb, app){
 		const kerberos = app.require('kerberos');
-		logger.log('info', connectionInfo);
+		logger.log('info', connectionInfo, 'Connection information', connectionInfo.hiddenKeys);
 
 		let options = setAuthData({
 			host: connectionInfo.host,
@@ -45,7 +45,7 @@ module.exports = {
 	testConnection: function(connectionInfo, logger, cb, app){
 		this.connect(connectionInfo, logger, err => {
 			if(err){
-				logger.log('error', err);
+				logger.log('error', err, 'Test connection', connectionInfo.hiddenKeys);
 				return cb(err);
 			}
 
@@ -53,7 +53,7 @@ module.exports = {
 				return cb();
 			})
 			.catch(err => {
-				logger.log('error', err);
+				logger.log('error', err, 'Test connection', connectionInfo.hiddenKeys);
 				return cb(err);
 			});
 		}, app);

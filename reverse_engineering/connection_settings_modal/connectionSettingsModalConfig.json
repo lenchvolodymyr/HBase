@@ -59,7 +59,8 @@
 				"dependency": {
 					"key": "auth",
 					"value": "kerberos"
-				}
+				},
+				"isHiddenKey": true
 			},
 			{
 				"inputLabel": "Service principal",
