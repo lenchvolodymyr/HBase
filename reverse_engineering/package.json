@@ -7,5 +7,5 @@
     "async": "2.6.0",
     "node-fetch": "2.1.1"
   },
-  "installed": false
+  "installed": true
 }
