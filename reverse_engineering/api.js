@@ -436,7 +436,7 @@ function setAuthData(options, connectionInfo){
 	if (connectionInfo.auth === 'kerberos') {
 		authParams.krb5 = {
 			principal: connectionInfo.principal,
-			service_principal: 'HTTP' + (process.platform === 'win' ? '/' : '@') + connectionInfo.host,
+			service_principal: 'HTTP' + (process.platform === 'win32' ? '/' : '@') + connectionInfo.host,
 			password: connectionInfo.password
 		};
 	}
