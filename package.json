@@ -1,7 +1,7 @@
 {
 	"name": "HBase",
-	"version": "0.1.8",
-	"versionDate": "2018-12-20",
+	"version": "0.1.9",
+	"versionDate": "2019-01-17",
 	"author": "hackolade",
 	"engines": {
 		"hackolade": "2.3.2",

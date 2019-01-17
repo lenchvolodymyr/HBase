@@ -1,17 +1,18 @@
 
-const getTokenFromKerberos = (kerberos, service, user, password) => {
+const getTokenFromKerberos = (kerberos, service, principal, password) => {
 	const mechOID = kerberos.GSS_MECH_OID_SPNEGO;
+	const [ user, domain ] = principal.split('@');
 
 	return kerberos.initializeClient(service, {
-		user, password, mechOID
+		user, domain, password, mechOID
 	}).then(client => {
 		return client.step('');
 	});
 };
 
-const getClient = kerberos => ({ principal: user, service_principal: service, password }) => Promise.resolve({
+const getClient = kerberos => ({ principal, service_principal: service, password }) => Promise.resolve({
 	token: (callback) => {
-		getTokenFromKerberos(kerberos, service, user, password).then(
+		getTokenFromKerberos(kerberos, service, principal, password).then(
 			(token) => callback(null, token),
 			err => callback(err)
 		);
