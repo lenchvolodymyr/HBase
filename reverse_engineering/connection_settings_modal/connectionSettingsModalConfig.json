@@ -43,23 +43,6 @@
 				"defaultValue": "none"
 			},
 			{
-				"inputLabel": "Authentication type",
-				"inputKeyword": "krbAuthType",
-				"inputType": "select",
-				"options": [{
-					"value": "password",
-					"label": "password"
-				}, {
-					"value": "keytab",
-					"label": "keytab file"
-				}],
-				"defaultValue": "password",
-				"dependency": {
-					"key": "auth",
-					"value": "kerberos"
-				}
-			},
-			{
 				"inputLabel": "Principal",
 				"inputKeyword": "principal",
 				"inputType": "text",
@@ -76,17 +59,8 @@
 				"dependency": {
 					"key": "auth",
 					"value": "kerberos"
-				}
-			},
-			{
-				"inputLabel": "Keytab file",
-				"inputKeyword": "keytab",
-				"inputType": "file",
-				"extensions": ["keytab"],
-				"dependency": {
-					"key": "auth",
-					"value": "kerberos"
-				}
+				},
+				"isHiddenKey": true
 			},
 			{
 				"inputLabel": "Service principal",

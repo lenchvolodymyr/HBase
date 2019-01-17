@@ -5,6 +5,7 @@ const _ = require('lodash');
 const fetch = require('node-fetch');
 const versions = require('../package.json').contributes.target.versions;
 const colFamConfig = require('./columnFamilyConfig');
+const kerberosService = require('./kerberosService');
 var state = {
 	connectionInfo: {}
 };
@@ -12,8 +13,8 @@ var clientKrb = null;
 
 module.exports = {
 	connect: function(connectionInfo, logger, cb, app){
-		const krb5 = app.require('krb5');
-		logger.log('info', connectionInfo);
+		const kerberos = app.require('kerberos');
+		logger.log('info', connectionInfo, 'Connection information', connectionInfo.hiddenKeys);
 
 		let options = setAuthData({
 			host: connectionInfo.host,
@@ -21,14 +22,11 @@ module.exports = {
 		}, connectionInfo);
 		
 		if(!clientKrb && options.krb5){
-			clientKrb = krb5(options.krb5);
-			clientKrb.kinit((err) => {
-				if (err) {
-					return cb(err);
-				}
-
-				return cb();
-			});
+			kerberosService({ kerberos }).getClient(options.krb5)
+				.then(client => {
+					clientKrb = client;
+					return cb();			
+				}, err => cb(err));
 		} else {
 			return cb();
 		}
@@ -47,7 +45,7 @@ module.exports = {
 	testConnection: function(connectionInfo, logger, cb, app){
 		this.connect(connectionInfo, logger, err => {
 			if(err){
-				logger.log('error', err);
+				logger.log('error', err, 'Test connection', connectionInfo.hiddenKeys);
 				return cb(err);
 			}
 
@@ -55,7 +53,7 @@ module.exports = {
 				return cb();
 			})
 			.catch(err => {
-				logger.log('error', err);
+				logger.log('error', err, 'Test connection', connectionInfo.hiddenKeys);
 				return cb(err);
 			});
 		}, app);
@@ -438,9 +436,8 @@ function setAuthData(options, connectionInfo){
 	if (connectionInfo.auth === 'kerberos') {
 		authParams.krb5 = {
 			principal: connectionInfo.principal,
-			service_principal: connectionInfo.service_principal,
-			[connectionInfo.krbAuthType]: connectionInfo[connectionInfo.krbAuthType],
-			renew: true
+			service_principal: 'HTTP' + (process.platform === 'win' ? '/' : '@') + connectionInfo.host,
+			password: connectionInfo.password
 		};
 	}
 
