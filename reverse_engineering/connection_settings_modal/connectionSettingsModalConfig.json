@@ -61,16 +61,6 @@
 					"value": "kerberos"
 				},
 				"isHiddenKey": true
-			},
-			{
-				"inputLabel": "Service principal",
-				"inputKeyword": "service_principal",
-				"inputType": "text",
-				"inputPlaceholder": "HTTP@{fqdn}",
-				"dependency": {
-					"key": "auth",
-					"value": "kerberos"
-				}
 			}
 		]
 	}
