@@ -22,10 +22,12 @@ module.exports = {
 		}, connectionInfo);
 		
 		if(!clientKrb && options.krb5){
+			logger.log('info', Object.assign({}, options.krb5, { platform: process.platform }), 'Kerberos options', connectionInfo.hiddenKeys);
+
 			kerberosService({ kerberos }).getClient(options.krb5)
 				.then(client => {
 					clientKrb = client;
-					return cb();			
+					return cb();
 				}, err => cb(err));
 		} else {
 			return cb();
@@ -43,30 +45,33 @@ module.exports = {
 	},
 
 	testConnection: function(connectionInfo, logger, cb, app){
+		logger.clear();
+		
 		this.connect(connectionInfo, logger, err => {
 			if(err){
 				logger.log('error', err, 'Test connection', connectionInfo.hiddenKeys);
 				return cb(err);
 			}
 
-			getClusterVersion(connectionInfo).then(version => {
+			getClusterVersion(connectionInfo, logger).then(version => {
 				return cb();
 			})
 			.catch(err => {
-				logger.log('error', err, 'Test connection', connectionInfo.hiddenKeys);
-				return cb(err);
+				return logError(logger, cb)(err, 'Test connection', connectionInfo.hiddenKeys);
 			});
 		}, app);
 	},
 
 	getDbCollectionsNames: function(connectionInfo, logger, cb, app) {
+		logger.clear();
+
 		this.connect(connectionInfo, logger, err => {
 			if(err){
-				return cb(err);
+				return logError(logger, cb)(err, 'Connection error', connectionInfo.hiddenKeys);
 			}
 			state.connectionInfo = connectionInfo;
 
-			getNamespacesList(connectionInfo).then(namespaces => {
+			getNamespacesList(connectionInfo, logger).then(namespaces => {
 				async.mapSeries(namespaces, (namespace, callback) => {
 					getTablesList(connectionInfo, namespace)
 						.then(res => {
@@ -75,13 +80,17 @@ module.exports = {
 							return callback(err);
 						});
 				}, (err, items) => {
+					if (err) {
+						return logError(logger, cb)(err, 'Get tables names error', connectionInfo.hiddenKeys);
+					}
+
 					items = prepareDataItems(namespaces, items);
+
 					return cb(err, items);
 				});
 			})
 			.catch(err => {
-				logger.log('error', err);
-				return cb(err);
+				logError(logger, cb)(err, 'Get tables names error', connectionInfo.hiddenKeys);
 			});
 		}, app);
 	},
@@ -159,23 +168,21 @@ module.exports = {
 							return tableCallback(null, documentsPackage);
 						})
 						.catch(err => {
-							logger.log('error', err);
-							return tableCallback(err);
+							return tableCallback(err, []);
 						});
 				}, (err, items) => {
-					if(err){
-						logger.log('error', err);
-					} else {
+					if(!err){
 						items = items.filter(item => item);
 					}
 					return callback(err, items);
 				});
 			}
 		}, (err, res) => {
-			if(err){
-				logger.log('error', err);
+			if (err) {
+				return logError(logger, cb)(err, 'Get data error', state.connectionInfo.hiddenKeys);
+			} else {
+				return cb(err, res, info);
 			}
-			return cb(err, res, info);
 		});
 	}
 };
@@ -187,7 +194,7 @@ function getHostURI(connectionInfo){
 }
 
 
-function getRequestOptions() {
+function getRequestOptions(data, logger) {
 	return new Promise((resolve, reject) => {
 		let headers = {
 			'Cache-Control': 'no-cache',
@@ -198,6 +205,10 @@ function getRequestOptions() {
 			clientKrb.token((err, token) => {
 				if (err) {
 					return reject(err);
+				}
+
+				if (logger) {
+					logger.log('info', { token });
 				}
 
 				headers.Authorization = `Negotiate ${token}`;
@@ -216,8 +227,8 @@ function getRequestOptions() {
 	});
 }
 
-function fetchRequest(query, connectionInfo){
-	return getRequestOptions(connectionInfo)
+function fetchRequest(query, connectionInfo, logger){
+	return getRequestOptions(connectionInfo, logger)
 		.then((options) => {
 			return fetch(query, options)
 		})
@@ -227,10 +238,10 @@ function fetchRequest(query, connectionInfo){
 		});
 }
 
-function getNamespacesList(connectionInfo){
+function getNamespacesList(connectionInfo, logger){
 	let query = `${getHostURI(connectionInfo)}/namespaces`;
 
-	return fetchRequest(query, connectionInfo).then(res => {
+	return fetchRequest(query, connectionInfo, logger).then(res => {
 		return res.Namespace.filter(item => item !== 'hbase');
 	});
 }
@@ -262,10 +273,10 @@ function getTableSchema(namespace, table, connectionInfo){
 	});
 }
 
-function getClusterVersion(connectionInfo){
+function getClusterVersion(connectionInfo, logger){
 	let query = `${getHostURI(connectionInfo)}/version/cluster`;
 
-	return fetchRequest(query, connectionInfo).then(res => {
+	return fetchRequest(query, connectionInfo, logger).then(res => {
 		return res;
 	});
 }
@@ -541,4 +552,12 @@ const getRows = (data) => {
 	});
 
 	return cells;
+};
+
+const logError = (logger, cb) => (err, subject, hiddenKeys) => {
+	logger.log('error', err, subject, hiddenKeys);
+
+	setTimeout(() => {
+		cb(err);
+	}, 1000);
 };
