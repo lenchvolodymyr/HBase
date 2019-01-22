@@ -10,6 +10,7 @@ var state = {
 	connectionInfo: {}
 };
 var clientKrb = null;
+const DEFAULT_NAMESPACE = 'No Namespace'
 
 module.exports = {
 	connect: function(connectionInfo, logger, cb, app){
@@ -73,7 +74,7 @@ module.exports = {
 
 			getNamespacesList(connectionInfo, logger).then(namespaces => {
 				async.mapSeries(namespaces, (namespace, callback) => {
-					getTablesList(connectionInfo, namespace)
+					getTablesList(connectionInfo, namespace, logger)
 						.then(res => {
 							return callback(null, res);
 						}, (err) => {
@@ -238,26 +239,64 @@ function fetchRequest(query, connectionInfo, logger){
 		});
 }
 
+const getTableNames = (connectionInfo, logger) => {
+	let query = `${getHostURI(connectionInfo)}/`;
+
+	return fetchRequest(query, connectionInfo, logger).then(res => {
+		return _.get(res, 'table', []).map(table => table.name);
+	});
+};
+
+const splitTableName = name => name.indexOf(':') !== -1 ? name.split(':') : ['', name];
+
+const getNamespacesFromTables = (tables) => {
+	return Promise.resolve(_.uniq(tables.map((tableName) => splitTableName(tableName || '').shift())));
+};
+
 function getNamespacesList(connectionInfo, logger){
 	let query = `${getHostURI(connectionInfo)}/namespaces`;
 
 	return fetchRequest(query, connectionInfo, logger).then(res => {
-		return res.Namespace.filter(item => item !== 'hbase');
+		return res.Namespace;
+	}, err => {
+		const areNamespacesNotAllowed = (err.code === 405);
+
+		if (areNamespacesNotAllowed) {
+			return getTableNames(connectionInfo, logger).then(getNamespacesFromTables);
+		} else {
+			return Promise.reject(err);
+		}
+	}).then(res => {
+		return res.filter(item => item !== 'hbase');
 	});
 }
 
-function getTablesList(connectionInfo, namespace){
+function getTablesList(connectionInfo, namespace, logger){
 	let query = `${getHostURI(connectionInfo)}/namespaces/${namespace}/tables`;
 
-	return fetchRequest(query, connectionInfo).then(res => {
+	return fetchRequest(query, connectionInfo, logger).then(res => {
 		return res;
+	}, err => {
+		const areNamespacesNotAllowed = (err.code === 404);
+
+		if (areNamespacesNotAllowed) {
+			return getTableNames(connectionInfo, logger).then(filterTables.bind(null, namespace)).then(tableNames => ({ table: tableNames }));
+		} else {
+			return Promise.reject(err);
+		}
 	});
 }
+
+const filterTables = (namespace, tableNames) => {
+	return tableNames.map(splitTableName)
+		.filter(([ namespaceName ]) => namespaceName === namespace)
+		.map(([ns, name]) => ({ name }));
+};
 
 function prepareDataItems(namespaces, items){
 	return items.map((item, index) => {
 		return {
-			dbName: namespaces[index],
+			dbName: namespaces[index] || DEFAULT_NAMESPACE,
 			dbCollections: item.table.map(table => {
 				return table.name;
 			})
@@ -266,7 +305,7 @@ function prepareDataItems(namespaces, items){
 }
 
 function getTableSchema(namespace, table, connectionInfo){
-	let query = `${getHostURI(connectionInfo)}/${namespace}:${table}/schema`;
+	let query = `${getHostURI(connectionInfo)}/${getNamespaceTableName(namespace, table)}/schema`;
 
 	return fetchRequest(query, connectionInfo).then(res => {
 		return res;
@@ -280,6 +319,8 @@ function getClusterVersion(connectionInfo, logger){
 		return res;
 	});
 }
+
+const getNamespaceTableName = (namespace, table) => (namespace && namespace !== DEFAULT_NAMESPACE) ? `${namespace}:${table}` : table;
 
 function handleRows(rows){
 	let data = {
@@ -495,7 +536,7 @@ const getScannerBody = (recordSamplingSettings) => {
 };
 
 const scanDocuments = (namespace, table, recordSamplingSettings, connectionInfo) => {
-	const tableName = `${namespace}:${table}`;
+	const tableName = getNamespaceTableName(namespace, table);
 	let query = `${getHostURI(connectionInfo)}/${tableName}/scanner`;
 
 	return getRequestOptions()
