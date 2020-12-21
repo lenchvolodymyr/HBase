@@ -101,7 +101,7 @@ module.exports = {
 		let namespaces = data.collectionData.dataBaseNames;
 		let info = { 
 			host: state.connectionInfo.host,
-			port: state.connectionInfo.port
+			port: Number(state.connectionInfo.port)
 		};
 
 		async.map(namespaces, (namespace, callback) => {
