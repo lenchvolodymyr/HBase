@@ -2,6 +2,8 @@
 
 const async = require('async');
 const _ = require('lodash');
+const https = require('https');
+const fs = require('fs');
 const fetch = require('node-fetch');
 const versions = require('../package.json').contributes.target.versions;
 const colFamConfig = require('./columnFamilyConfig');
@@ -194,13 +196,46 @@ function getHostURI(connectionInfo){
 	return query;
 }
 
+function getSslOptions(data) {
+	return new Promise((resolve, reject) => {
+		try {
+			if (!data.https) {
+				return resolve(null);
+			}
+	
+			const certs = {};
+	
+			if (fs.existsSync(data.sslCaFile)) {
+				certs.ca = fs.readFileSync(data.sslCaFile);
+			}
+	
+			if (fs.existsSync(data.sslCertFile)) {
+				certs.cert = fs.readFileSync(data.sslCertFile);
+			}
+	
+			if (fs.existsSync(data.sslKeyFile)) {
+				certs.key = fs.readFileSync(data.sslKeyFile);
+			}
+	
+			return resolve(certs);
+		} catch (error) {
+			reject(error);
+		}
+	});
+}
 
 function getRequestOptions(data, logger) {
-	return new Promise((resolve, reject) => {
+	return getSslOptions(data)
+	.then(certs => new Promise((resolve, reject) => {
 		let headers = {
 			'Cache-Control': 'no-cache',
 			'Accept': 'application/json'
 		};
+		let agent = null;
+
+		if (!_.isEmpty(certs)) {
+			agent = https.Agent(certs);
+		}
 	
 		if (clientKrb) {
 			clientKrb.token((err, token) => {
@@ -216,16 +251,18 @@ function getRequestOptions(data, logger) {
 	
 				resolve({
 					method: 'GET',
-					headers
+					headers,
+					agent,
 				});
 			});
 		} else {
 			resolve({
-				'method': 'GET',
-				'headers': headers
+				method: 'GET',
+				headers: headers,
+				agent,
 			});
 		}
-	});
+	}));
 }
 
 function fetchRequest(query, connectionInfo, logger){
@@ -539,7 +576,7 @@ const scanDocuments = (namespace, table, recordSamplingSettings, connectionInfo)
 	const tableName = getNamespaceTableName(namespace, table);
 	let query = `${getHostURI(connectionInfo)}/${tableName}/scanner`;
 
-	return getRequestOptions()
+	return getRequestOptions(connectionInfo)
 		.then(options => {
 			options.method = 'PUT';
 			options.body = getScannerBody(recordSamplingSettings);
@@ -552,11 +589,11 @@ const scanDocuments = (namespace, table, recordSamplingSettings, connectionInfo)
 		.then(({ response, result }) => {
 			return response.headers.get('location') || '';
 		})
-		.then(getCells);
+		.then(query => getCells(connectionInfo, query));
 };
 
-const getCells = (query, cells = []) => new Promise((resolve, reject) => {
-	return getRequestOptions()
+const getCells = (connectionInfo, query, cells = []) => new Promise((resolve, reject) => {
+	return getRequestOptions(connectionInfo)
 		.then(options => {
 			return fetch(query, options);
 		})
@@ -567,7 +604,7 @@ const getCells = (query, cells = []) => new Promise((resolve, reject) => {
 			} else {
 				const data = getRows(JSON.parse(result))
 
-				return getCells(query, [ ...cells, ...data ]);
+				return getCells(connectionInfo, query, [ ...cells, ...data ]);
 			}
 		})
 		.then(resolve, reject);
